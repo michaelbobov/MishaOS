@@ -763,8 +763,8 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--win-white);
-    border: 1px solid var(--win-border-dark);
+    background: transparent;
+    border: none;
 }
 
 .ai-title {
@@ -1049,8 +1049,8 @@ body.move-mode-active * {
     height: 24px;
     object-fit: contain;
     image-rendering: pixelated;
-    border: 1px solid var(--win-border-dark);
-    background: var(--win-white);
+    border: none;
+    background: transparent;
 }
 
 .quill-logo-icon {
