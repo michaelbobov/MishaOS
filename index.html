@@ -3,66 +3,254 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portfolio - Retro Japanese Design</title>
+    <title>Program Manager</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="room-background">
         <div class="crt-monitor">
             <div class="monitor-screen">
-                    <div class="screen-content">
-                    <header class="portfolio-header">
-                        <h1 class="retro-title">ポートフォリオ</h1>
-                        <p class="subtitle">Product Design Portfolio</p>
-                    </header>
+                <div class="screen-content win31-desktop">
+                    <!-- Desktop Icons (top left) -->
+                    <div class="desktop-icons-area">
+                        <!-- Program Manager icon (when minimized) will appear here -->
+                        <!-- Quill AI icon -->
+                        <div class="desktop-icon" id="ai-assistant-icon" data-app="ai-assistant">
+                            <div class="desktop-icon-image">
+                                <div class="quill-icon"></div>
+                            </div>
+                            <div class="desktop-icon-label">Quill AI</div>
+                        </div>
+                    </div>
                     
-                    <nav class="portfolio-nav">
-                        <a href="#about" class="nav-link">About</a>
-                        <a href="#projects" class="nav-link">Projects</a>
-                        <a href="#contact" class="nav-link">Contact</a>
-                    </nav>
+                    <!-- Taskbar for running processes (bottom left of desktop) -->
+                    <div class="desktop-taskbar">
+                        <!-- Running processes will appear here -->
+                    </div>
                     
-                    <main class="portfolio-main">
-                        <section id="about" class="portfolio-section">
-                            <h2 class="section-title">About</h2>
-                            <p class="section-text">
-                                Welcome to my design portfolio. This space showcases my work in product design,
-                                blending modern functionality with timeless aesthetics.
-                            </p>
-                        </section>
-                        
-                        <section id="projects" class="portfolio-section">
-                            <h2 class="section-title">Projects</h2>
-                            <div class="projects-grid">
-                                <div class="project-card">
-                                    <h3 class="project-title">Project 1</h3>
-                                    <p class="project-description">A beautiful product design that combines form and function.</p>
-                                    <a href="#" class="project-link">View Project →</a>
+                    <!-- Status Bar (bottom of screen with time/date) -->
+                    <div class="desktop-status-bar">
+                        <div class="status-bar-left">
+                            <div class="status-bar-item" id="volume-control" title="Volume">
+                                <span class="status-icon">🔊</span>
+                                <span class="status-value" id="volume-value">100%</span>
+                            </div>
+                            <div class="status-bar-item" id="network-status" title="Network">
+                                <span class="status-icon">📡</span>
+                                <span class="status-value">Online</span>
+                            </div>
+                            <div class="status-bar-item" id="cpu-status" title="System">
+                                <span class="status-icon">💻</span>
+                                <span class="status-value">Ready</span>
+                            </div>
+                        </div>
+                        <div class="status-bar-right">
+                            <div class="status-bar-date" id="status-date">Monday, January 1, 2024</div>
+                            <div class="status-bar-time" id="status-time">12:00 PM</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Program Manager Window -->
+                    <div class="program-manager">
+                        <div class="window-titlebar">
+                            <div class="system-menu">─</div>
+                            <span class="window-title">Program Manager</span>
+                            <div class="window-controls">
+                                <button class="window-btn">▼</button>
+                                <button class="window-btn">▲</button>
+                            </div>
+                        </div>
+                        <div class="menu-bar">
+                            <span class="menu-item"><u>F</u>ile</span>
+                            <span class="menu-item"><u>O</u>ptions</span>
+                            <span class="menu-item"><u>W</u>indow</span>
+                            <span class="menu-item"><u>H</u>elp</span>
+                        </div>
+                        <div class="program-manager-content">
+                            <!-- Program Groups shown as icons at bottom -->
+                            <div class="program-groups-bar">
+                                <div class="group-icon" data-group="accessories">
+                                    <div class="group-icon-image">
+                                        <div class="mini-window-icon"></div>
+                                    </div>
+                                    <div class="group-icon-label">Accessories</div>
                                 </div>
-                                <div class="project-card">
-                                    <h3 class="project-title">Project 2</h3>
-                                    <p class="project-description">An innovative solution to a complex design challenge.</p>
-                                    <a href="#" class="project-link">View Project →</a>
+                                <div class="group-icon" data-group="games">
+                                    <div class="group-icon-image">
+                                        <div class="mini-window-icon"></div>
+                                    </div>
+                                    <div class="group-icon-label">Games</div>
                                 </div>
-                                <div class="project-card">
-                                    <h3 class="project-title">Project 3</h3>
-                                    <p class="project-description">A minimalist approach to user experience design.</p>
-                                    <a href="#" class="project-link">View Project →</a>
+                                <div class="group-icon" data-group="startup">
+                                    <div class="group-icon-image">
+                                        <div class="mini-window-icon"></div>
+                                    </div>
+                                    <div class="group-icon-label">StartUp</div>
+                                </div>
+                                <div class="group-icon" data-group="network">
+                                    <div class="group-icon-image">
+                                        <div class="mini-window-icon"></div>
+                                    </div>
+                                    <div class="group-icon-label">Network</div>
+                                </div>
+                                <div class="group-icon selected" data-group="main">
+                                    <div class="group-icon-image">
+                                        <div class="mini-window-icon"></div>
+                                    </div>
+                                    <div class="group-icon-label">Main</div>
                                 </div>
                             </div>
-                        </section>
-                        
-                        <section id="contact" class="portfolio-section">
-                            <h2 class="section-title">Contact</h2>
-                            <p class="section-text">
-                                Get in touch to discuss design opportunities.
-                            </p>
-                        </section>
-                    </main>
-                    
+                        </div>
+                    </div>
+
+                    <!-- System Menu Dropdown (shared) -->
+                    <div class="system-menu-dropdown" id="system-menu-dropdown" style="display: none;">
+                        <div class="system-menu-item disabled"><u>R</u>estore</div>
+                        <div class="system-menu-item"><u>M</u>ove</div>
+                        <div class="system-menu-item"><u>S</u>ize</div>
+                        <div class="system-menu-item" data-action="minimize">Minimize</div>
+                        <div class="system-menu-item" data-action="maximize">Maximize</div>
+                        <div class="system-menu-separator"></div>
+                        <div class="system-menu-item" data-action="close"><u>C</u>lose<span class="shortcut">Alt+F4</span></div>
+                        <div class="system-menu-separator"></div>
+                        <div class="system-menu-item">Next<span class="shortcut">Ctrl+F6</span></div>
+                    </div>
+
+                    <!-- Desktop Icon Context Menu -->
+                    <div class="system-menu-dropdown" id="desktop-icon-menu" style="display: none;">
+                        <div class="system-menu-item" data-action="restore"><u>R</u>estore</div>
+                        <div class="system-menu-item" data-action="move"><u>M</u>ove</div>
+                        <div class="system-menu-item disabled"><u>S</u>ize</div>
+                        <div class="system-menu-item disabled" data-action="minimize">Minimize</div>
+                        <div class="system-menu-item" data-action="maximize">Maximize</div>
+                        <div class="system-menu-separator"></div>
+                        <div class="system-menu-item" data-action="close"><u>C</u>lose<span class="shortcut">Alt+F4</span></div>
+                        <div class="system-menu-separator"></div>
+                        <div class="system-menu-item" data-action="switch-to">Switch To...<span class="shortcut">Ctrl+Esc</span></div>
+                    </div>
+
+                    <!-- Main Program Group Window (opens on double-click) -->
+                    <div class="program-group-window" id="main-window" style="display: none;">
+                        <div class="window-titlebar">
+                            <div class="system-menu">─</div>
+                            <span class="window-title">Main</span>
+                            <div class="window-controls">
+                                <button class="window-btn">▼</button>
+                                <button class="window-btn">▲</button>
+                            </div>
+                        </div>
+                        <div class="program-group-content">
+                            <div class="program-icon" data-app="file-manager">
+                                <div class="app-icon file-manager-icon"></div>
+                                <div class="program-icon-label">File<br>Manager</div>
+                            </div>
+                            <div class="program-icon" data-app="control-panel">
+                                <div class="app-icon control-panel-icon"></div>
+                                <div class="program-icon-label">Control<br>Panel</div>
+                            </div>
+                            <div class="program-icon" data-app="print-manager">
+                                <div class="app-icon print-manager-icon"></div>
+                                <div class="program-icon-label">Print<br>Manager</div>
+                            </div>
+                            <div class="program-icon" data-app="clipboard">
+                                <div class="app-icon clipboard-icon"></div>
+                                <div class="program-icon-label">Clipboard<br>Viewer</div>
+                            </div>
+                            <div class="program-icon" data-app="dos-prompt">
+                                <div class="app-icon dos-icon"></div>
+                                <div class="program-icon-label">MS-DOS<br>Prompt</div>
+                            </div>
+                            <div class="program-icon" data-app="setup">
+                                <div class="app-icon setup-icon"></div>
+                                <div class="program-icon-label">Windows<br>Setup</div>
+                            </div>
+                            <div class="program-icon" data-app="pif-editor">
+                                <div class="app-icon pif-icon"></div>
+                                <div class="program-icon-label">PIF Editor</div>
+                            </div>
+                            <div class="program-icon" data-app="readme">
+                                <div class="app-icon readme-icon"></div>
+                                <div class="program-icon-label">Read Me</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Games Program Group Window -->
+                    <div class="program-group-window" id="games-window" style="display: none;">
+                        <div class="window-titlebar">
+                            <div class="system-menu">─</div>
+                            <span class="window-title">Games</span>
+                            <div class="window-controls">
+                                <button class="window-btn">▼</button>
+                                <button class="window-btn">▲</button>
+                            </div>
+                        </div>
+                        <div class="program-group-content">
+                            <div class="program-icon" data-app="minesweeper">
+                                <div class="app-icon minesweeper-icon"></div>
+                                <div class="program-icon-label">Minesweeper</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quill AI Application Window -->
+                    <div class="application-window window" id="ai-assistant-app" style="display: none;">
+                        <div class="window-titlebar">
+                            <div class="system-menu">─</div>
+                            <span class="window-title">Quill AI</span>
+                            <div class="window-controls">
+                                <button class="window-btn">▼</button>
+                                <button class="window-btn">▲</button>
+                            </div>
+                        </div>
+                        <div class="window-content">
+                            <div class="ai-assistant-content">
+                                <div class="ai-header">
+                                    <div class="ai-logo">
+                                        <div class="quill-logo-icon"></div>
+                                    </div>
+                                    <div class="ai-title">Quill AI</div>
+                                </div>
+                                <div class="ai-chat-area" id="ai-chat-area">
+                                    <div class="ai-message ai-system">
+                                        <div class="message-text">Welcome! I'm Quill AI, your retro AI assistant. Ask me anything or search the web.</div>
+                                    </div>
+                                </div>
+                                <div class="ai-input-area">
+                                    <input type="text" class="ai-input" id="ai-input" placeholder="Type your question or search query..." />
+                                    <button class="ai-send-btn" id="ai-send-btn">Send</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Minesweeper Application Window -->
+                    <div class="application-window window" id="minesweeper-app" style="display: none;">
+                        <div class="window-titlebar">
+                            <div class="system-menu">─</div>
+                            <span class="window-title">Minesweeper</span>
+                            <div class="window-controls">
+                                <button class="window-btn">▼</button>
+                                <button class="window-btn">▲</button>
+                            </div>
+                        </div>
+                        <div class="window-content">
+                            <div class="minesweeper-game">
+                                <div class="minesweeper-header">
+                                    <div class="minesweeper-counter" id="mine-counter">010</div>
+                                    <button class="minesweeper-face" id="face-button">😊</button>
+                                    <div class="minesweeper-counter" id="time-counter">000</div>
+                                </div>
+                                <div class="minesweeper-board" id="minesweeper-board">
+                                    <!-- Board will be generated by JavaScript -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="scanlines"></div>
                     <div class="screen-flicker"></div>
-                    </div>
+                </div>
             </div>
         </div>
     </div>
