@@ -853,6 +853,46 @@ class ProgramManager {
         canvas.width = 400;
         canvas.height = 350;
         
+        // V-line parameters for perspective (MUST be defined before use)
+        const V_LINE_PARAMS = {
+            vanishingPointY: 20,
+            vanishingPointX: 200,
+            bottomY: 350,
+            bottomLeftX: -120,
+            bottomRightX: 520
+        };
+        
+        // Track player Y for scaling (updated each frame)
+        let playerYForScale = 150;
+
+        // Get scale factor based on Y position (distance)
+        // Gentle scaling: 0.75 (far) to 1.0 (close), and shrink more above player
+        function getDistanceScale(y) {
+            const { vanishingPointY, bottomY } = V_LINE_PARAMS;
+            const clampedY = Math.max(vanishingPointY, Math.min(bottomY, y));
+            const tBelow = (clampedY - vanishingPointY) / (bottomY - vanishingPointY);
+            let base = 0.75 + Math.max(0, Math.min(1, tBelow)) * 0.25; // 75% to 100%
+
+            // If object is above player, shrink further
+            const playerRefY = Math.max(vanishingPointY + 1, Math.min(bottomY, playerYForScale));
+            if (clampedY < playerRefY) {
+                const tAbove = (playerRefY - clampedY) / (playerRefY - vanishingPointY);
+                const shrink = 0.8 - 0.3 * Math.max(0, Math.min(1, tAbove)); // 0.8 down to 0.5
+                base *= shrink;
+            }
+
+            return Math.max(0.5, Math.min(1.0, base));
+        }
+        
+        // Get X bounds at a given Y position (within V-line)
+        function getXBoundsAtY(y) {
+            const { vanishingPointY, vanishingPointX, bottomLeftX, bottomRightX, bottomY } = V_LINE_PARAMS;
+            const t = Math.max(0, (y - vanishingPointY) / (bottomY - vanishingPointY));
+            const leftBound = vanishingPointX + (bottomLeftX - vanishingPointX) * t;
+            const rightBound = vanishingPointX + (bottomRightX - vanishingPointX) * t;
+            return { left: leftBound, right: rightBound };
+        }
+        
         // Load skier image
         const skierImg = new Image();
         skierImg.src = 'assets/skier.png';
@@ -865,9 +905,9 @@ class ProgramManager {
         let gameRunning = false;
         let gameOver = false;
         let distance = 0;
-        let speed = 3;
-        let maxSpeed = 8;
-        let turboSpeed = 12;
+        let speed = 2;       // slower base speed
+        let maxSpeed = 6;    // lower top speed
+        let turboSpeed = 9;  // lower turbo speed
         let isTurbo = false;
         let isJumping = false;
         let jumpHeight = 0;
@@ -876,7 +916,7 @@ class ProgramManager {
         // Animation state
         let isAnimating = false;
         const startY = -30; // Start off-screen at top
-        const targetY = 200; // Lower position (~57% of 350) for more width
+        const targetY = 150; // Higher position for more vertical play space
         const animationSpeed = 3; // Pixels per frame (faster intro)
         
         // Player state
@@ -913,8 +953,8 @@ class ProgramManager {
             const rightBound = vanishingPointX + (bottomRightX - vanishingPointX) * t;
             
             // Random X within V-line bounds (with small margin)
-            const margin = 20;
-            const x = (leftBound + margin) + Math.random() * (rightBound - leftBound - margin * 2);
+            const margin = 10;
+            const x = (leftBound + margin) + Math.random() * Math.max(10, (rightBound - leftBound - margin * 2));
             
             // Base dimensions (will be scaled when drawing)
             const baseWidth = type === 'tree' ? 20 : type === 'rock' ? 24 : type === 'ramp' ? 30 : 18;
@@ -943,8 +983,8 @@ class ProgramManager {
                 const t = Math.max(0, (y - vanishingPointY) / (bottomY - vanishingPointY));
                 const leftBound = vanishingPointX + (bottomLeftX - vanishingPointX) * t;
                 const rightBound = vanishingPointX + (bottomRightX - vanishingPointX) * t;
-                const margin = 20;
-                const x = (leftBound + margin) + Math.random() * (rightBound - leftBound - margin * 2);
+                const margin = 10;
+                const x = (leftBound + margin) + Math.random() * Math.max(10, (rightBound - leftBound - margin * 2));
                 
                 const type = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
                 const baseWidth = type === 'tree' ? 20 : type === 'rock' ? 24 : type === 'ramp' ? 30 : 18;
@@ -1211,32 +1251,6 @@ class ProgramManager {
             ctx.fillText('💀', player.x, player.y);
         }
         
-        // V-line parameters (fixed coordinates for 400x350 canvas)
-        const V_LINE_PARAMS = {
-            vanishingPointY: 20,
-            vanishingPointX: 200,
-            bottomY: 350,
-            bottomLeftX: -120,
-            bottomRightX: 520
-        };
-        
-        // Get scale factor based on Y position (distance)
-        function getDistanceScale(y) {
-            const { vanishingPointY, bottomY } = V_LINE_PARAMS;
-            // Scale from 0.3 (far/small) to 1.0 (close/large)
-            const t = (y - vanishingPointY) / (bottomY - vanishingPointY);
-            return 0.3 + Math.max(0, Math.min(1, t)) * 0.7;
-        }
-        
-        // Get X bounds at a given Y position (within V-line)
-        function getXBoundsAtY(y) {
-            const { vanishingPointY, vanishingPointX, bottomLeftX, bottomRightX, bottomY } = V_LINE_PARAMS;
-            const t = Math.max(0, (y - vanishingPointY) / (bottomY - vanishingPointY));
-            const leftBound = vanishingPointX + (bottomLeftX - vanishingPointX) * t;
-            const rightBound = vanishingPointX + (bottomRightX - vanishingPointX) * t;
-            return { left: leftBound, right: rightBound };
-        }
-        
         // Draw perspective V-line guide (for debugging - can be toggled)
         const showPerspectiveGuide = true; // Set to true to show guide lines
         
@@ -1295,11 +1309,11 @@ class ProgramManager {
                 // Update speed
                 const currentMaxSpeed = isTurbo ? turboSpeed : maxSpeed;
                 if (keys.down) {
-                    speed = Math.min(speed + 0.1, currentMaxSpeed);
+                    speed = Math.min(speed + 0.06, currentMaxSpeed);
                 } else if (isTurbo) {
-                    speed = Math.min(speed + 0.05, turboSpeed);
+                    speed = Math.min(speed + 0.04, turboSpeed);
                 } else {
-                    speed = Math.max(3, speed - 0.02);
+                    speed = Math.max(2, speed - 0.03);
                 }
                 
                 // Update direction
@@ -1315,6 +1329,8 @@ class ProgramManager {
                 player.x += player.direction * speed * 0.8;
                 const bounds = getXBoundsAtY(player.y);
                 player.x = Math.max(bounds.left + 15, Math.min(bounds.right - 15, player.x));
+                // Track player Y for scaling calculations
+                playerYForScale = player.y;
                 
                 // Update jump
                 if (isJumping) {
@@ -1335,6 +1351,15 @@ class ProgramManager {
                 for (let obs of obstacles) {
                     obs.y -= speed;
                     
+                    // Keep X within V-line bounds at this Y (clamp only, no sliding)
+                    const bounds = getXBoundsAtY(obs.y);
+                    const margin = 10;
+                    const left = bounds.left + margin;
+                    const right = bounds.right - margin;
+                    if (left < right) {
+                        obs.x = Math.max(left, Math.min(right, obs.x));
+                    }
+                    
                     // Update scale based on Y position (bigger when closer/lower)
                     obs.scale = getDistanceScale(obs.y);
                     
@@ -1353,8 +1378,8 @@ class ProgramManager {
                     }
                 }
                 
-                // Remove passed obstacles and add new ones
-                obstacles = obstacles.filter(obs => obs.y > -50);
+                // Remove passed obstacles before they reach the top (vanishing point)
+                obstacles = obstacles.filter(obs => obs.y > V_LINE_PARAMS.vanishingPointY + 40);
                 while (obstacles.length < 8) {
                     obstacles.push(generateObstacle());
                 }
@@ -1389,7 +1414,7 @@ class ProgramManager {
             // Draw obstacles (sorted by y for proper layering)
             obstacles.sort((a, b) => a.y - b.y);
             for (let obs of obstacles) {
-                if (obs.y > -30 && obs.y < canvas.height + 30) {
+                if (obs.y > V_LINE_PARAMS.vanishingPointY + 40 && obs.y < canvas.height + 30) {
                     drawObstacle(obs);
                 }
             }
