@@ -1,0 +1,274 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Courier New', 'MS Gothic', monospace;
+    overflow: hidden;
+    height: 100vh;
+    background: #000;
+}
+
+:root {
+    /* Adjust these values to position the content over your monitor screen */
+    --screen-width: 34.5vw;
+    --screen-height: 52vh;
+    --screen-top: 18vh;
+    --screen-left: calc(50vw + 28px);
+}
+
+.room-background {
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+    overflow: hidden;
+    background-image: url('assets/monitor.png');
+    background-size: cover;
+    background-position: center;
+}
+
+.crt-monitor {
+    position: absolute;
+    inset: 0;
+}
+
+.monitor-screen {
+    position: absolute;
+    width: var(--screen-width);
+    height: var(--screen-height);
+    top: var(--screen-top);
+    left: var(--screen-left);
+    transform: translateX(-50%);
+    background: transparent;
+    overflow: hidden;
+    border: none;
+    box-shadow: none;
+}
+
+.screen-content {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+    color: #00ff00;
+    padding: 30px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: relative;
+    z-index: 2;
+    /* Subtle inner shadow to create depth inside the screen */
+    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.9);
+}
+
+/* Custom scrollbar with retro style */
+.screen-content::-webkit-scrollbar {
+    width: 12px;
+}
+
+.screen-content::-webkit-scrollbar-track {
+    background: #0a0a0a;
+    border-left: 1px solid #333;
+}
+
+.screen-content::-webkit-scrollbar-thumb {
+    background: #00ff00;
+    border: 2px solid #0a0a0a;
+}
+
+.screen-content::-webkit-scrollbar-thumb:hover {
+    background: #00cc00;
+}
+
+/* Retro Japanese Typography */
+.retro-title {
+    font-size: 3em;
+    color: #00ff00;
+    text-shadow: 
+        0 0 10px #00ff00,
+        0 0 20px #00ff00,
+        0 0 30px #00ff00;
+    margin-bottom: 10px;
+    letter-spacing: 3px;
+    font-weight: bold;
+}
+
+.subtitle {
+    font-size: 1.2em;
+    color: #88ff88;
+    margin-bottom: 30px;
+    letter-spacing: 2px;
+}
+
+.portfolio-nav {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 40px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #00ff00;
+}
+
+.nav-link {
+    color: #00ff00;
+    text-decoration: none;
+    font-size: 1.1em;
+    padding: 8px 16px;
+    border: 1px solid #00ff00;
+    transition: all 0.3s ease;
+    background: rgba(0, 255, 0, 0.05);
+}
+
+.nav-link:hover {
+    background: rgba(0, 255, 0, 0.2);
+    box-shadow: 0 0 10px #00ff00;
+    transform: translateY(-2px);
+}
+
+.portfolio-section {
+    margin-bottom: 50px;
+}
+
+.section-title {
+    font-size: 2em;
+    color: #00ff00;
+    margin-bottom: 20px;
+    text-shadow: 0 0 10px #00ff00;
+    border-left: 4px solid #00ff00;
+    padding-left: 15px;
+}
+
+.section-text {
+    color: #88ff88;
+    line-height: 1.8;
+    font-size: 1.1em;
+    margin-bottom: 20px;
+}
+
+.projects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-top: 30px;
+}
+
+.project-card {
+    background: rgba(0, 255, 0, 0.05);
+    border: 1px solid #00ff00;
+    padding: 20px;
+    transition: all 0.3s ease;
+}
+
+.project-card:hover {
+    background: rgba(0, 255, 0, 0.1);
+    box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+    transform: translateY(-5px);
+}
+
+.project-title {
+    color: #00ff00;
+    font-size: 1.5em;
+    margin-bottom: 10px;
+    text-shadow: 0 0 5px #00ff00;
+}
+
+.project-description {
+    color: #88ff88;
+    line-height: 1.6;
+    margin-bottom: 15px;
+}
+
+.project-link {
+    color: #00ff00;
+    text-decoration: none;
+    font-weight: bold;
+    display: inline-block;
+    transition: all 0.3s ease;
+}
+
+.project-link:hover {
+    color: #88ff88;
+    text-shadow: 0 0 10px #00ff00;
+}
+
+/* CRT Screen Effects */
+.scanlines {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.15),
+        rgba(0, 0, 0, 0.15) 1px,
+        transparent 1px,
+        transparent 2px
+    );
+    pointer-events: none;
+    z-index: 3;
+}
+
+.screen-flicker {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    animation: flicker 0.15s infinite;
+    pointer-events: none;
+    z-index: 4;
+}
+
+@keyframes flicker {
+    0% { opacity: 1; }
+    50% { opacity: 0.98; }
+    100% { opacity: 1; }
+}
+
+/* Positioning Helper - Uncomment to see the content area outline for alignment */
+/*
+.monitor-screen::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: 2px dashed rgba(255, 0, 0, 0.5);
+    pointer-events: none;
+    z-index: 1000;
+}
+*/
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    :root {
+        --screen-width: 85%;
+        --screen-height: 65%;
+        --screen-top: 15%;
+    }
+    
+    .retro-title {
+        font-size: 2em;
+    }
+    
+    .projects-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Glow effect for text */
+@keyframes glow {
+    0%, 100% {
+        text-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00;
+    }
+    50% {
+        text-shadow: 0 0 15px #00ff00, 0 0 25px #00ff00, 0 0 35px #00ff00;
+    }
+}
+
+.retro-title {
+    animation: glow 2s ease-in-out infinite;
+}
+

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Position Helper - Portfolio</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+        }
+        
+        .controls {
+            background: #0a0a0a;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+            max-width: 600px;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #88ff88;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            margin-bottom: 5px;
+        }
+        
+        .value-display {
+            color: #00ff00;
+            font-weight: bold;
+        }
+        
+        .code-output {
+            background: #000;
+            border: 1px solid #00ff00;
+            padding: 15px;
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            color: #00ff00;
+        }
+        
+        button {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        
+        button:hover {
+            background: #88ff88;
+        }
+    </style>
+</head>
+<body>
+    <h1>Monitor Screen Position Helper</h1>
+    <p style="color: #88ff88; margin-bottom: 20px;">
+        Adjust the sliders to position the content area over your monitor screen, then copy the CSS values.
+    </p>
+    
+    <div class="controls">
+        <div class="control-group">
+            <label>Screen Width: <span class="value-display" id="width-value">50%</span></label>
+            <input type="range" id="width" min="20" max="80" value="50" step="1">
+        </div>
+        
+        <div class="control-group">
+            <label>Screen Height: <span class="value-display" id="height-value">55%</span></label>
+            <input type="range" id="height" min="20" max="80" value="55" step="1">
+        </div>
+        
+        <div class="control-group">
+            <label>Top Position: <span class="value-display" id="top-value">20%</span></label>
+            <input type="range" id="top" min="0" max="50" value="20" step="1">
+        </div>
+        
+        <div class="control-group">
+            <label>Left Position: <span class="value-display" id="left-value">50%</span></label>
+            <input type="range" id="left" min="0" max="100" value="50" step="1">
+        </div>
+        
+        <div class="control-group">
+            <label>Max Width: <span class="value-display" id="max-width-value">800px</span></label>
+            <input type="range" id="max-width" min="400" max="1200" value="800" step="50">
+        </div>
+        
+        <div class="control-group">
+            <label>Max Height: <span class="value-display" id="max-height-value">550px</span></label>
+            <input type="range" id="max-height" min="300" max="800" value="550" step="50">
+        </div>
+        
+        <button onclick="updateCSS()">Update CSS Variables</button>
+        <button onclick="copyToClipboard()">Copy CSS to Clipboard</button>
+    </div>
+    
+    <div class="code-output" id="css-output">
+:root {
+    --screen-width: 50%;
+    --screen-height: 55%;
+    --screen-top: 20%;
+    --screen-left: 50%;
+    --screen-max-width: 800px;
+    --screen-max-height: 550px;
+}
+    </div>
+    
+    <script>
+        const inputs = ['width', 'height', 'top', 'left', 'max-width', 'max-height'];
+        const valueDisplays = {
+            'width': 'width-value',
+            'height': 'height-value',
+            'top': 'top-value',
+            'left': 'left-value',
+            'max-width': 'max-width-value',
+            'max-height': 'max-height-value'
+        };
+        
+        inputs.forEach(id => {
+            const input = document.getElementById(id);
+            const display = document.getElementById(valueDisplays[id]);
+            
+            input.addEventListener('input', () => {
+                let value = input.value;
+                if (id === 'max-width' || id === 'max-height') {
+                    display.textContent = value + 'px';
+                } else {
+                    display.textContent = value + '%';
+                }
+                updateCSS();
+            });
+        });
+        
+        function updateCSS() {
+            const width = document.getElementById('width').value;
+            const height = document.getElementById('height').value;
+            const top = document.getElementById('top').value;
+            const left = document.getElementById('left').value;
+            const maxWidth = document.getElementById('max-width').value;
+            const maxHeight = document.getElementById('max-height').value;
+            
+            const css = `:root {
+    --screen-width: ${width}%;
+    --screen-height: ${height}%;
+    --screen-top: ${top}%;
+    --screen-left: ${left}%;
+    --screen-max-width: ${maxWidth}px;
+    --screen-max-height: ${maxHeight}px;
+}`;
+            
+            document.getElementById('css-output').textContent = css;
+            
+            // Update the actual page if it's open
+            if (window.opener) {
+                const style = window.opener.document.documentElement.style;
+                style.setProperty('--screen-width', width + '%');
+                style.setProperty('--screen-height', height + '%');
+                style.setProperty('--screen-top', top + '%');
+                style.setProperty('--screen-left', left + '%');
+                style.setProperty('--screen-max-width', maxWidth + 'px');
+                style.setProperty('--screen-max-height', maxHeight + 'px');
+            }
+        }
+        
+        function copyToClipboard() {
+            const css = document.getElementById('css-output').textContent;
+            navigator.clipboard.writeText(css).then(() => {
+                alert('CSS copied to clipboard! Paste it into your styles.css file.');
+            });
+        }
+    </script>
+</body>
+</html>
+
