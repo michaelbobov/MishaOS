@@ -207,6 +207,14 @@
                                 <div class="app-icon skifree-icon"></div>
                                 <div class="program-icon-label">SkiFree</div>
                             </div>
+                            <div class="program-icon" data-app="solitaire">
+                                <div class="app-icon solitaire-icon"></div>
+                                <div class="program-icon-label">Solitaire</div>
+                            </div>
+                            <div class="program-icon" data-app="doom">
+                                <div class="app-icon doom-icon"></div>
+                                <div class="program-icon-label">Doom</div>
+                            </div>
                         </div>
                     </div>
 
@@ -229,6 +237,100 @@
                             <canvas id="skifree-canvas" width="400" height="350"></canvas>
                             <div class="skifree-instructions">
                                 ← → to steer | ↓ to speed up | SPACE to jump | F to go fast
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Doom-like Game Window -->
+                    <div class="application-window window" id="doom-app" style="display: none;">
+                        <div class="window-titlebar">
+                            <div class="system-menu">─</div>
+                            <span class="window-title">Doom</span>
+                            <div class="window-controls">
+                                <button class="window-btn">▼</button>
+                                <button class="window-btn">▲</button>
+                            </div>
+                        </div>
+                        <div class="window-content doom-content">
+                            <div class="doom-header">
+                                <div class="doom-stats">
+                                    <span id="doom-health">Health: 100</span>
+                                    <span id="doom-ammo">Ammo: 30</span>
+                                    <span id="doom-score">Score: 0</span>
+                                <span id="doom-level">Level: 1</span>
+                                <span id="doom-weapon">Weapon: Pistol</span>
+                                </div>
+                                <div class="doom-actions">
+                                    <button class="doom-btn" id="doom-restart">Restart</button>
+                                </div>
+                            </div>
+                            <canvas id="doom-canvas" width="320" height="200"></canvas>
+                            <div class="doom-help">
+                                WASD to move, Q/E to turn, SPACE to shoot
+                            </div>
+                            <div class="doom-overlay" id="doom-overlay" style="display: none;">
+                                <div class="doom-overlay-card">
+                                    <div class="doom-overlay-title" id="doom-overlay-title">Level Cleared</div>
+                                    <div class="doom-overlay-body" id="doom-overlay-body">Choose an option</div>
+                                    <div class="doom-overlay-actions" id="doom-overlay-actions">
+                                        <button class="doom-btn" id="doom-start">Start</button>
+                                        <button class="doom-btn" id="doom-next-level">Next Level</button>
+                                        <button class="doom-btn" id="doom-buy-ammo">Buy Ammo (20 score)</button>
+                                        <button class="doom-btn" id="doom-restart-overlay">Restart</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Solitaire Game Window -->
+                    <div class="application-window window" id="solitaire-app" style="display: none;">
+                        <div class="window-titlebar">
+                            <div class="system-menu">─</div>
+                            <span class="window-title">Solitaire</span>
+                            <div class="window-controls">
+                                <button class="window-btn">▼</button>
+                                <button class="window-btn">▲</button>
+                            </div>
+                        </div>
+                        <div class="window-content solitaire-content">
+                            <div class="solitaire-header">
+                                <div class="solitaire-info">
+                                    <span class="solitaire-status" id="solitaire-status">New Game</span>
+                                    <span class="solitaire-moves" id="solitaire-moves">Moves: 0</span>
+                                    <span class="solitaire-time" id="solitaire-time">Time: 0s</span>
+                                    <span class="solitaire-score" id="solitaire-score">Score: 0</span>
+                                </div>
+                                <div class="solitaire-actions">
+                                    <button class="solitaire-btn" id="solitaire-new-game">New Game</button>
+                                    <button class="solitaire-btn" id="solitaire-reset">Reset</button>
+                                    <button class="solitaire-btn" id="solitaire-undo">Undo</button>
+                                    <button class="solitaire-btn" id="solitaire-autocomplete">Auto</button>
+                                    <button class="solitaire-btn" id="solitaire-draw-toggle" title="Toggle draw count">Draw: 3</button>
+                                </div>
+                            </div>
+                            <div class="solitaire-board">
+                                <div class="solitaire-top-row">
+                                    <div class="stock-area">
+                                        <div class="stock" id="solitaire-stock" title="Stock"></div>
+                                        <div class="waste" id="solitaire-waste" title="Waste"></div>
+                                    </div>
+                                    <div class="foundations" id="solitaire-foundations">
+                                        <div class="foundation" data-foundation="0"></div>
+                                        <div class="foundation" data-foundation="1"></div>
+                                        <div class="foundation" data-foundation="2"></div>
+                                        <div class="foundation" data-foundation="3"></div>
+                                    </div>
+                                </div>
+                                <div class="tableau" id="solitaire-tableau">
+                                    <div class="tableau-pile" data-pile="0"></div>
+                                    <div class="tableau-pile" data-pile="1"></div>
+                                    <div class="tableau-pile" data-pile="2"></div>
+                                    <div class="tableau-pile" data-pile="3"></div>
+                                    <div class="tableau-pile" data-pile="4"></div>
+                                    <div class="tableau-pile" data-pile="5"></div>
+                                    <div class="tableau-pile" data-pile="6"></div>
+                                </div>
                             </div>
                         </div>
                     </div>

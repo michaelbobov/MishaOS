@@ -8,6 +8,545 @@ class ProgramManager {
         this.init();
     }
 
+    initDoom() {
+        const canvas = document.getElementById('doom-canvas');
+        const ctx = canvas.getContext('2d');
+        const healthEl = document.getElementById('doom-health');
+        const ammoEl = document.getElementById('doom-ammo');
+        const scoreEl = document.getElementById('doom-score');
+        const levelEl = document.getElementById('doom-level');
+        const weaponEl = document.getElementById('doom-weapon');
+        const restartBtn = document.getElementById('doom-restart');
+        const gunImg = new Image();
+        gunImg.src = 'assets/gun.png';
+        let gunLoaded = false;
+        gunImg.onload = () => gunLoaded = true;
+
+        // Canvas dimensions
+        const W = canvas.width;
+        const H = canvas.height;
+
+        // Simple map (1=wall, 0=floor) - less maze-like, more rooms
+        const map = [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,1,0,0,1,0,0,0,0,0,1],
+            [1,0,0,0,0,0,1,0,0,1,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+        ];
+        const mapW = map[0].length;
+        const mapH = map.length;
+
+        const fov = Math.PI / 3; // 60 deg
+        const numRays = W;
+        const depth = 20;
+
+        let player = {
+            x: 2.5,
+            y: 2.5,
+            dir: 0,
+            health: 100,
+            ammo: 30,
+            score: 0,
+            alive: true
+        };
+
+        let enemies = [];
+        let bullets = [];
+        let overlayMode = null; // 'level', 'dead' or null
+
+        const keys = { w:false, a:false, s:false, d:false, q:false, e:false, space:false };
+
+        let level = 1;
+        let weapon = { name: 'Pistol', damage: 1, ammoUse: 1 };
+
+        function isWall(x, y) {
+            const ix = Math.floor(x);
+            const iy = Math.floor(y);
+            if (ix < 0 || iy < 0 || ix >= mapW || iy >= mapH) return true;
+            return map[iy][ix] === 1;
+        }
+
+        function updateHUD() {
+            healthEl.textContent = `Health: ${player.health}`;
+            ammoEl.textContent = `Ammo: ${player.ammo}`;
+            scoreEl.textContent = `Score: ${player.score}`;
+            levelEl.textContent = `Level: ${level}`;
+            weaponEl.textContent = `Weapon: ${weapon.name}`;
+        }
+
+        function castRays(depthBuffer) {
+            for (let col = 0; col < numRays; col++) {
+                const rayAngle = (player.dir - fov/2) + (col / numRays) * fov;
+                let distToWall = 0;
+                let hitWall = false;
+
+                const eyeX = Math.cos(rayAngle);
+                const eyeY = Math.sin(rayAngle);
+
+                while (!hitWall && distToWall < depth) {
+                    distToWall += 0.05;
+                    const testX = player.x + eyeX * distToWall;
+                    const testY = player.y + eyeY * distToWall;
+                    if (isWall(testX, testY)) {
+                        hitWall = true;
+                    }
+                }
+
+                const ceiling = (H/2) - H / distToWall;
+                const floor = H - ceiling;
+                const shade = Math.max(0, 1 - distToWall / depth);
+                ctx.fillStyle = `rgba(150,0,0,${shade})`;
+                ctx.fillRect(col, ceiling, 1, floor - ceiling);
+                // floor
+                ctx.fillStyle = `rgba(40,40,40,1)`;
+                ctx.fillRect(col, floor, 1, H - floor);
+
+                depthBuffer[col] = distToWall;
+            }
+        }
+
+        function renderSprites(depthBuffer) {
+            const sprites = enemies
+                .filter(en => en.alive)
+                .map(en => {
+                    const dx = en.x - player.x;
+                    const dy = en.y - player.y;
+                    const dist = Math.hypot(dx, dy);
+                    const angleTo = Math.atan2(dy, dx) - player.dir;
+                    // normalize angle
+                    const a = ((angleTo + Math.PI) % (2*Math.PI)) - Math.PI;
+                    return {en, dist, angle: a};
+                })
+                .filter(s => Math.abs(s.angle) < fov/2 && s.dist > 0.2) // in view
+                .sort((a,b) => b.dist - a.dist); // far to near
+
+            sprites.forEach(s => {
+                const size = Math.min(120, H / s.dist);
+                const screenX = (s.angle + fov/2) / fov * W;
+                const x0 = screenX - size/2;
+                const y0 = H/2 - size/2;
+                
+                // Draw monster with more detail (body, eyes, mouth)
+                ctx.save();
+                // Body - dark green/brown demon
+                for (let x = 0; x < size; x++) {
+                    const sx = Math.floor(x0 + x);
+                    if (sx < 0 || sx >= W) continue;
+                    if (depthBuffer[sx] < s.dist) continue;
+                    
+                    const relX = x / size; // 0 to 1
+                    // Body shape (wider in middle)
+                    const bodyAlpha = relX > 0.2 && relX < 0.8 ? 1 : 0.6;
+                    ctx.fillStyle = `rgba(100,40,20,${bodyAlpha})`;
+                    ctx.fillRect(sx, y0, 1, size);
+                }
+                
+                // Eyes (glowing red)
+                const eyeSize = Math.max(2, size * 0.15);
+                const eyeY = y0 + size * 0.3;
+                const eyeLeft = x0 + size * 0.3;
+                const eyeRight = x0 + size * 0.7;
+                
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(eyeLeft, eyeY, eyeSize, eyeSize);
+                ctx.fillRect(eyeRight, eyeY, eyeSize, eyeSize);
+                
+                // Mouth (dark)
+                const mouthY = y0 + size * 0.65;
+                const mouthW = size * 0.4;
+                const mouthH = size * 0.15;
+                ctx.fillStyle = '#000';
+                ctx.fillRect(x0 + size * 0.3, mouthY, mouthW, mouthH);
+                
+                // Health bar (only when recently hit)
+                const en = s.en;
+                if (en && en.showHealthTimer > 0 && en.maxHp) {
+                    const barWidth = size * 0.6;
+                    const barHeight = 5;
+                    const barX = x0 + size/2 - barWidth/2;
+                    const barY = y0 - 8;
+                    const ratio = Math.max(0, Math.min(1, en.hp / en.maxHp));
+                    // background
+                    ctx.fillStyle = 'rgba(60,0,0,0.8)';
+                    ctx.fillRect(barX, barY, barWidth, barHeight);
+                    // fill
+                    ctx.fillStyle = 'rgba(0,200,0,0.9)';
+                    ctx.fillRect(barX, barY, barWidth * ratio, barHeight);
+                    // border
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(barX, barY, barWidth, barHeight);
+                }
+                
+                ctx.restore();
+            });
+        }
+
+        function renderGun() {
+            const gunW = gunLoaded ? 220 : 120;
+            const gunH = gunLoaded ? 160 : 90;
+            const x = W/2 - gunW/2;
+            const y = H - gunH + 10;
+            if (gunLoaded) {
+                ctx.drawImage(gunImg, x, y, gunW, gunH);
+            } else {
+                ctx.fillStyle = '#444';
+                ctx.fillRect(x, y, gunW, gunH);
+                ctx.fillStyle = '#888';
+                ctx.fillRect(x+6, y+10, gunW-12, gunH-20);
+                ctx.fillStyle = '#222';
+                ctx.fillRect(x+gunW/2-6, y-6, 12, 12);
+            }
+        }
+
+        function movePlayer(dt) {
+            const moveSpeed = 2.5 * dt;
+            const rotSpeed = 2.2 * dt;
+            if (keys.q) player.dir -= rotSpeed;
+            if (keys.e) player.dir += rotSpeed;
+
+            let dx = 0, dy = 0;
+            if (keys.w) { dx += Math.cos(player.dir) * moveSpeed; dy += Math.sin(player.dir) * moveSpeed; }
+            if (keys.s) { dx -= Math.cos(player.dir) * moveSpeed; dy -= Math.sin(player.dir) * moveSpeed; }
+            if (keys.a) { dx += Math.cos(player.dir - Math.PI/2) * moveSpeed; dy += Math.sin(player.dir - Math.PI/2) * moveSpeed; }
+            if (keys.d) { dx += Math.cos(player.dir + Math.PI/2) * moveSpeed; dy += Math.sin(player.dir + Math.PI/2) * moveSpeed; }
+
+            const nx = player.x + dx;
+            const ny = player.y + dy;
+            if (!isWall(nx, player.y)) player.x = nx;
+            if (!isWall(player.x, ny)) player.y = ny;
+        }
+
+        function spawnEnemiesForLevel() {
+            enemies = [];
+            const count = Math.min(10, 2 + level * 2);
+            for (let i = 0; i < count; i++) {
+                let x = 0, y = 0;
+                let tries = 0;
+                do {
+                    x = 2 + Math.random() * (mapW - 4);
+                    y = 2 + Math.random() * (mapH - 4);
+                    tries++;
+                } while ((isWall(x,y) || Math.hypot(x - player.x, y - player.y) < 3) && tries < 50);
+                const maxHp = 6 + level * 2; // tougher enemies each level
+                enemies.push({
+                    x, y,
+                    alive: true,
+                    hp: maxHp,
+                    maxHp,
+                    speed: 0.8 + level * 0.1,
+                    showHealthTimer: 0
+                });
+            }
+        }
+
+        function updateEnemies(dt) {
+            enemies.forEach((en) => {
+                if (!en.alive) return;
+                if (en.showHealthTimer > 0) en.showHealthTimer = Math.max(0, en.showHealthTimer - dt);
+                const dx = player.x - en.x;
+                const dy = player.y - en.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist < 0.8) {
+                    // Damage player
+                    player.health -= 10 * dt;
+                    if (player.health <= 0) {
+                        player.health = 0;
+                        player.alive = false;
+                    }
+                    // Push enemy away to avoid overlapping / clipping through player
+                    const pushDist = Math.max(0.8 - dist, 0.05);
+                    const norm = dist > 0.0001 ? dist : 1;
+                    const pushX = (dx / norm) * pushDist * 0.6;
+                    const pushY = (dy / norm) * pushDist * 0.6;
+                    const nx = en.x - pushX;
+                    const ny = en.y - pushY;
+                    if (!isWall(nx, en.y)) en.x = nx;
+                    if (!isWall(en.x, ny)) en.y = ny;
+                } else {
+                    const speed = en.speed * dt;
+                    const stepX = dx / dist * speed;
+                    const stepY = dy / dist * speed;
+                    const nx = en.x + stepX;
+                    const ny = en.y + stepY;
+                    if (!isWall(nx, en.y)) en.x = nx;
+                    if (!isWall(en.x, ny)) en.y = ny;
+                }
+            });
+        }
+
+        function allEnemiesDead() {
+            return enemies.every(en => !en.alive);
+        }
+
+        function nextLevel() {
+            level++;
+            // Reward
+            player.ammo += 10;
+            player.health = Math.min(100, player.health + 20);
+            // Upgrade weapon every 2 levels
+            if (level === 2) weapon = { name: 'Shotgun', damage: 2, ammoUse: 1 };
+            if (level === 4) weapon = { name: 'Chaingun', damage: 1, ammoUse: 0.5 };
+            spawnEnemiesForLevel();
+        }
+
+        // Overlay handling
+        const overlay = document.getElementById('doom-overlay');
+        const overlayTitle = document.getElementById('doom-overlay-title');
+        const overlayBody = document.getElementById('doom-overlay-body');
+        const overlayActions = document.getElementById('doom-overlay-actions');
+        const startBtn = document.getElementById('doom-start');
+        const nextBtn = document.getElementById('doom-next-level');
+        const buyAmmoBtn = document.getElementById('doom-buy-ammo');
+        const restartOverlayBtn = document.getElementById('doom-restart-overlay');
+
+        function showOverlay(type) {
+            overlayMode = type;
+            if (!overlay) return;
+            document.exitPointerLock && document.exitPointerLock();
+            if (type === 'start') {
+                overlayTitle.textContent = 'Misha Doom';
+                overlayBody.textContent = 'Click Start to begin';
+                startBtn.style.display = 'inline-block';
+                nextBtn.style.display = 'none';
+                buyAmmoBtn.style.display = 'none';
+                restartOverlayBtn.style.display = 'none';
+            } else if (type === 'level') {
+                overlayTitle.textContent = 'Level Cleared';
+                overlayBody.textContent = 'Choose next action';
+                startBtn.style.display = 'none';
+                nextBtn.style.display = 'inline-block';
+                buyAmmoBtn.style.display = 'inline-block';
+                restartOverlayBtn.style.display = 'inline-block';
+            } else if (type === 'dead') {
+                overlayTitle.textContent = 'YOU DIED';
+                overlayBody.textContent = 'The darkness consumes you. Restart?';
+                startBtn.style.display = 'none';
+                nextBtn.style.display = 'none';
+                buyAmmoBtn.style.display = 'none';
+                restartOverlayBtn.style.display = 'inline-block';
+            }
+            overlay.style.display = 'flex';
+        }
+
+        function hideOverlay() {
+            overlayMode = null;
+            if (overlay) overlay.style.display = 'none';
+        }
+
+        function shoot() {
+            if (player.ammo <= 0) return;
+            player.ammo -= weapon.ammoUse;
+            const speed = 18; // faster, longer range
+            const isShotgun = weapon.name === 'Shotgun';
+            const isChaingun = weapon.name === 'Chaingun';
+            const pelletCount = isShotgun ? 10 : isChaingun ? 3 : 1;
+            const spread = isShotgun ? 0.8 : isChaingun ? 0.18 : 0.05; // much wider bloom for shotgun
+            const shotBloom = (Math.random() - 0.5) * 0.2; // per-shot base bloom to fan out the blast
+            for (let i = 0; i < pelletCount; i++) {
+                const pelletBloom = (Math.random() - 0.5) * spread;
+                const angleJitter = shotBloom + pelletBloom;
+                bullets.push({
+                    x: player.x,
+                    y: player.y,
+                    dir: player.dir + angleJitter,
+                    speed,
+                    alive: true
+                });
+            }
+        }
+
+        function updateBullets(dt) {
+            bullets = bullets.filter(b => b.alive);
+            bullets.forEach(b => {
+                const nx = b.x + Math.cos(b.dir) * b.speed * dt;
+                const ny = b.y + Math.sin(b.dir) * b.speed * dt;
+                if (isWall(nx, ny)) { b.alive = false; return; }
+                b.x = nx; b.y = ny;
+                // hit enemy?
+                enemies.forEach(en => {
+                    if (!en.alive) return;
+                    const dist = Math.hypot(en.x - b.x, en.y - b.y);
+                    if (dist < 1.0) { // larger hit radius so distant shots still connect
+                        // Distance-based damage falloff: close = full, far = reduced (no one-shots from afar)
+                        const falloff = Math.max(0.35, 1 - (dist / 8)); // beyond ~8 units trims to 35%
+                        const dmg = weapon.damage * falloff;
+                        en.hp -= dmg;
+                        en.showHealthTimer = 2; // show health bar after being hit
+                        if (en.hp <= 0) {
+                            en.alive = false;
+                            player.score += 50;
+                        }
+                        b.alive = false;
+                    }
+                });
+            });
+            bullets = bullets.filter(b => b.alive);
+        }
+
+        function renderBullets(depthBuffer) {
+            bullets.forEach(b => {
+                const dx = b.x - player.x;
+                const dy = b.y - player.y;
+                const dist = Math.hypot(dx, dy);
+                const angleTo = Math.atan2(dy, dx) - player.dir;
+                const a = ((angleTo + Math.PI) % (2*Math.PI)) - Math.PI;
+                if (Math.abs(a) > fov/2 || dist <= 0.1) return;
+                const size = Math.max(3, Math.min(12, 55 / dist));
+                const screenX = (a + fov/2) / fov * W;
+                const x0 = Math.floor(screenX);
+                const y0 = Math.floor(H/2 - size/2);
+                // splatter: multiple sparks around the shot line
+                const sparks = 4 + Math.floor(Math.random() * 3);
+                for (let i = 0; i < sparks; i++) {
+                    const jitterX = (Math.random() - 0.5) * size * 0.8;
+                    const jitterY = (Math.random() - 0.5) * size * 0.6;
+                    const sx = Math.floor(x0 + jitterX);
+                    const sy = Math.floor(y0 + jitterY);
+                    if (sx < 0 || sx >= W) continue;
+                    if (depthBuffer[sx] < dist) continue;
+                    const sparkSize = Math.max(2, size * 0.4);
+                    const grad = ctx.createLinearGradient(0, sy, 0, sy + sparkSize);
+                    grad.addColorStop(0, 'rgba(255,235,59,0.95)');
+                    grad.addColorStop(1, 'rgba(255,120,0,0.75)');
+                    ctx.fillStyle = grad;
+                    ctx.fillRect(sx, sy, 2, sparkSize);
+                }
+            });
+        }
+
+        let lastTime = performance.now();
+        function loop(ts) {
+            const dt = Math.min(0.05, (ts - lastTime) / 1000);
+            lastTime = ts;
+            if (player.alive && !overlayMode) {
+                movePlayer(dt);
+                updateEnemies(dt);
+                updateBullets(dt);
+                if (player.health <= 0) {
+                    player.health = 0;
+                    player.alive = false;
+                }
+                if (allEnemiesDead()) {
+                    showOverlay('level');
+                } else if (!player.alive) {
+                    showOverlay('dead');
+                }
+            }
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0,0,W,H);
+            const depthBuffer = new Array(numRays).fill(depth);
+            castRays(depthBuffer);
+            renderSprites(depthBuffer);
+            renderBullets(depthBuffer);
+            renderGun();
+            updateHUD();
+            requestAnimationFrame(loop);
+        }
+
+        function requestPointerLock() {
+            if (canvas.requestPointerLock) {
+                canvas.requestPointerLock();
+            }
+        }
+
+        document.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement === canvas) {
+                const sensitivity = 0.0025;
+                player.dir += e.movementX * sensitivity;
+            }
+        });
+
+        canvas.addEventListener('click', () => {
+            requestPointerLock();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'w' || e.key === 'W') keys.w = true;
+            if (e.key === 'a' || e.key === 'A') keys.a = true;
+            if (e.key === 's' || e.key === 'S') keys.s = true;
+            if (e.key === 'd' || e.key === 'D') keys.d = true;
+            if (e.key === 'q' || e.key === 'Q') keys.q = true;
+            if (e.key === 'e' || e.key === 'E') keys.e = true;
+            if (e.code === 'Space') {
+                keys.space = true;
+                shoot();
+            }
+            if (e.key === 'f' || e.key === 'F') {
+                shoot();
+            }
+        });
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'w' || e.key === 'W') keys.w = false;
+            if (e.key === 'a' || e.key === 'A') keys.a = false;
+            if (e.key === 's' || e.key === 'S') keys.s = false;
+            if (e.key === 'd' || e.key === 'D') keys.d = false;
+            if (e.key === 'q' || e.key === 'Q') keys.q = false;
+            if (e.key === 'e' || e.key === 'E') keys.e = false;
+            if (e.code === 'Space') keys.space = false;
+        });
+
+        function startNewRun() {
+            player = {
+                x: 2.5,
+                y: 2.5,
+                dir: 0,
+                health: 100,
+                ammo: 30,
+                score: 0,
+                alive: true
+            };
+            level = 1;
+            weapon = { name: 'Pistol', damage: 1, ammoUse: 1 };
+            bullets = [];
+            hideOverlay();
+            spawnEnemiesForLevel();
+        }
+
+        restartBtn.addEventListener('click', () => {
+            startNewRun();
+        });
+
+        nextBtn?.addEventListener('click', () => {
+            hideOverlay();
+            nextLevel();
+        });
+
+        buyAmmoBtn?.addEventListener('click', () => {
+            const cost = 20;
+            if (player.score >= cost) {
+                player.score -= cost;
+                player.ammo += 20;
+                updateHUD();
+            }
+        });
+
+        restartOverlayBtn?.addEventListener('click', () => {
+            startNewRun();
+        });
+
+        startBtn?.addEventListener('click', () => {
+            startNewRun();
+        });
+
+        // Show start screen initially
+        showOverlay('start');
+
+        loop(performance.now());
+    }
+
     init() {
         this.setupGroupIcons();
         this.setupProgramIcons();
@@ -557,6 +1096,10 @@ class ProgramManager {
                     this.openMinesweeper();
                 } else if (app === 'skifree') {
                     this.openSkiFree();
+                } else if (app === 'solitaire') {
+                    this.openSolitaire();
+                } else if (app === 'doom') {
+                    this.openDoom();
                 }
             });
         });
@@ -815,6 +1358,529 @@ class ProgramManager {
         renderBoard();
     }
 
+    openSolitaire() {
+        const solitaireApp = document.getElementById('solitaire-app');
+        if (!solitaireApp) return;
+
+        if (solitaireApp.style.display === 'none' || !solitaireApp.style.display) {
+            solitaireApp.style.display = 'flex';
+            solitaireApp.style.left = `${90 + Math.random() * 60}px`;
+            solitaireApp.style.top = `${60 + Math.random() * 40}px`;
+            solitaireApp.style.width = '620px';
+            solitaireApp.style.height = '520px';
+            this.setupWindowDrag(solitaireApp);
+            this.setupSingleWindowControls(solitaireApp);
+            
+            // Remove from taskbar if it was there
+            this.removeFromTaskbar('solitaire-app');
+            
+            // Initialize game if not already initialized
+            if (!solitaireApp.dataset.initialized) {
+                this.initSolitaire();
+                solitaireApp.dataset.initialized = 'true';
+            }
+        }
+        
+        // Always bring to front when opening/clicking
+        this.focusWindow(solitaireApp);
+    }
+
+    initSolitaire() {
+        const stockEl = document.getElementById('solitaire-stock');
+        const wasteEl = document.getElementById('solitaire-waste');
+        const foundationsEl = document.getElementById('solitaire-foundations');
+        const tableauEl = document.getElementById('solitaire-tableau');
+        const statusEl = document.getElementById('solitaire-status');
+        const movesEl = document.getElementById('solitaire-moves');
+        const newBtn = document.getElementById('solitaire-new-game');
+        const resetBtn = document.getElementById('solitaire-reset');
+        const timeEl = document.getElementById('solitaire-time');
+        const scoreEl = document.getElementById('solitaire-score');
+        const undoBtn = document.getElementById('solitaire-undo');
+        const autoBtn = document.getElementById('solitaire-autocomplete');
+        const drawToggleBtn = document.getElementById('solitaire-draw-toggle');
+
+        const suits = ['♠', '♥', '♦', '♣'];
+        const ranks = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+
+        let stock = [];
+        let waste = [];
+        let foundations = [[],[],[],[]];
+        let tableau = [[],[],[],[],[],[],[]];
+        let moves = 0;
+        let selected = null; // {type:'stock'|'waste'|'foundation'|'tableau', pile:index, cardIndex:index}
+        let drawCount = 3; // default draw-3
+        let score = 0;
+        let seconds = 0;
+        let timerInterval = null;
+        let undoStack = [];
+
+        function colorForSuit(suit) {
+            return (suit === '♥' || suit === '♦') ? 'red' : 'black';
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            seconds = 0;
+            if (timeEl) timeEl.textContent = 'Time: 0s';
+            timerInterval = setInterval(() => {
+                seconds++;
+                if (timeEl) timeEl.textContent = `Time: ${seconds}s`;
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+            timerInterval = null;
+        }
+
+        function pushUndo() {
+            const snapshot = JSON.stringify({
+                stock, waste, foundations, tableau, moves, score, seconds
+            });
+            undoStack.push(snapshot);
+            if (undoStack.length > 80) undoStack.shift();
+        }
+
+        function popUndo() {
+            if (!undoStack.length) return false;
+            const snap = undoStack.pop();
+            const state = JSON.parse(snap);
+            stock = state.stock;
+            waste = state.waste;
+            foundations = state.foundations;
+            tableau = state.tableau;
+            moves = state.moves;
+            score = state.score;
+            seconds = state.seconds;
+            if (timeEl) timeEl.textContent = `Time: ${seconds}s`;
+            return true;
+        }
+
+        function buildDeck() {
+            const deck = [];
+            for (let s of suits) {
+                for (let r of ranks) {
+                    deck.push({ suit: s, rank: r, faceUp: false, id: `${r}${s}-${Math.random().toString(36).slice(2,6)}` });
+                }
+            }
+            // shuffle
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+            return deck;
+        }
+
+        function resetGame() {
+            stopTimer();
+            stock = buildDeck();
+            waste = [];
+            foundations = [[],[],[],[]];
+            tableau = [[],[],[],[],[],[],[]];
+            moves = 0;
+            selected = null;
+            score = 0;
+            undoStack = [];
+
+            // Deal tableau
+            for (let col = 0; col < 7; col++) {
+                for (let i = 0; i <= col; i++) {
+                    const card = stock.pop();
+                    card.faceUp = i === col;
+                    tableau[col].push(card);
+                }
+            }
+
+            render();
+            statusEl.textContent = 'New Game';
+            movesEl.textContent = 'Moves: 0';
+            if (scoreEl) scoreEl.textContent = 'Score: 0';
+            startTimer();
+        }
+
+        function canMoveToFoundation(card, foundationPile) {
+            if (!card.faceUp) return false;
+            const top = foundationPile[foundationPile.length - 1];
+            if (!top) return card.rank === 'A';
+            const sameSuit = top.suit === card.suit;
+            const nextRank = ranks.indexOf(card.rank) === ranks.indexOf(top.rank) + 1;
+            return sameSuit && nextRank;
+        }
+
+        function canMoveToTableau(card, destPile) {
+            if (!card.faceUp) return false;
+            const top = destPile[destPile.length - 1];
+            if (!top) return card.rank === 'K';
+            const altColor = colorForSuit(card.suit) !== colorForSuit(top.suit);
+            const nextDown = ranks.indexOf(card.rank) === ranks.indexOf(top.rank) - 1;
+            return altColor && nextDown;
+        }
+
+        function takeFromPile(sel, single = false) {
+            if (sel.type === 'waste') return waste.pop();
+            if (sel.type === 'foundation') return foundations[sel.pile].pop();
+            if (sel.type === 'tableau') {
+                const pile = tableau[sel.pile];
+                if (single) {
+                    return pile.pop();
+                }
+                const cards = pile.splice(sel.cardIndex);
+                return cards.length === 1 ? cards[0] : cards;
+            }
+            return null;
+        }
+
+        function placeOnTarget(item, target) {
+            // item can be single card or array (for tableau moves)
+            const cards = Array.isArray(item) ? item : [item];
+            const card = cards[0];
+            if (target.type === 'foundation') {
+                if (cards.length > 1) return false;
+                const pile = foundations[target.pile];
+                if (!canMoveToFoundation(card, pile)) return false;
+                pile.push(card);
+                return true;
+            }
+            if (target.type === 'tableau') {
+                const pile = tableau[target.pile];
+                if (!canMoveToTableau(card, pile)) return false;
+                pile.push(...cards);
+                return true;
+            }
+            return false;
+        }
+
+        function flipIfNeeded() {
+            for (let pile of tableau) {
+                if (pile.length > 0) {
+                    const top = pile[pile.length - 1];
+                    if (!top.faceUp) top.faceUp = true;
+                }
+            }
+        }
+
+        function drawStock() {
+            if (stock.length === 0) {
+                // reset stock from waste
+                stock = waste.reverse().map(c => ({...c, faceUp: false}));
+                waste = [];
+            } else {
+                for (let i = 0; i < drawCount; i++) {
+                    if (stock.length === 0) break;
+                    const card = stock.pop();
+                    card.faceUp = true;
+                    waste.push(card);
+                }
+                moves++;
+                score -= 1;
+            }
+            render();
+        }
+
+        function autoMoveToFoundation(card, sourceSel) {
+            for (let i = 0; i < 4; i++) {
+                const pile = foundations[i];
+                if (canMoveToFoundation(card, pile)) {
+                    const removed = takeFromPile(sourceSel, true); // foundations only take single card
+                    if (removed) {
+                        pile.push(Array.isArray(removed) ? removed[0] : removed);
+                        moves++;
+                        score += 5;
+                        flipIfNeeded();
+                        render();
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function cardElement(card, opts) {
+            const el = document.createElement('div');
+            el.classList.add('card');
+            if (!card.faceUp) el.classList.add('face-down');
+            if (colorForSuit(card.suit) === 'red') el.classList.add('red');
+            if (opts?.selected) el.classList.add('selected');
+            el.dataset.id = card.id;
+            const top = document.createElement('div');
+            top.className = 'top';
+            top.textContent = card.faceUp ? `${card.rank}${card.suit}` : '';
+            const bottom = document.createElement('div');
+            bottom.className = 'bottom';
+            bottom.textContent = card.faceUp ? `${card.rank}${card.suit}` : '';
+            el.appendChild(top);
+            el.appendChild(bottom);
+            return el;
+        }
+
+        function render() {
+            statusEl.textContent = 'Playing';
+            movesEl.textContent = `Moves: ${moves}`;
+            if (scoreEl) scoreEl.textContent = `Score: ${score}`;
+            if (drawToggleBtn) drawToggleBtn.textContent = `Draw: ${drawCount}`;
+
+            // Stock
+            stockEl.innerHTML = '';
+            wasteEl.innerHTML = '';
+            if (stock.length > 0) {
+                const cardBack = document.createElement('div');
+                cardBack.className = 'card face-down';
+                cardBack.style.position = 'absolute';
+                cardBack.style.top = '0';
+                cardBack.style.left = '0';
+                stockEl.appendChild(cardBack);
+            }
+
+            // Waste
+            if (waste.length > 0) {
+                const top = waste[waste.length - 1];
+                const el = cardElement(top, selected?.type === 'waste' ? {selected:true}:null);
+                el.style.position = 'absolute';
+                el.style.top = '0';
+                el.style.left = '0';
+                wasteEl.appendChild(el);
+                el.addEventListener('click', () => selectCard({type:'waste'}));
+                el.addEventListener('contextmenu', (e) => { e.preventDefault(); autoMoveToFoundation(top, {type:'waste'}); });
+                el.addEventListener('dblclick', () => autoMoveToFoundation(top, {type:'waste'}));
+            }
+
+            // Foundations
+            foundationsEl.querySelectorAll('.foundation').forEach((fEl, idx) => {
+                fEl.innerHTML = '';
+                const pile = foundations[idx];
+                if (pile.length > 0) {
+                    const top = pile[pile.length - 1];
+                    const el = cardElement(top, selected?.type==='foundation' && selected.pile===idx ? {selected:true}:null);
+                    el.style.position = 'absolute';
+                    el.style.top = '0';
+                    el.style.left = '0';
+                    fEl.appendChild(el);
+                    el.addEventListener('click', () => selectCard({type:'foundation', pile: idx}));
+                } else {
+                    fEl.innerHTML = '<div class=\"pile-placeholder\"></div>';
+                }
+            });
+
+            // Tableau
+            tableauEl.querySelectorAll('.tableau-pile').forEach((pileEl, idx) => {
+                pileEl.innerHTML = '';
+                const pile = tableau[idx];
+                pile.forEach((card, cardIdx) => {
+                    const isSelected = selected?.type==='tableau' && selected.pile===idx && selected.cardIndex===cardIdx;
+                    const el = cardElement(card, isSelected ? {selected:true}:null);
+                    el.style.top = `${cardIdx * 20}px`;
+                    el.style.left = '0';
+                    el.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        handleTableauClick(idx, cardIdx);
+                    });
+                    el.addEventListener('dblclick', (e) => {
+                        e.stopPropagation();
+                        autoMoveToFoundation(card, {type:'tableau', pile: idx, cardIndex: cardIdx});
+                    });
+                    pileEl.appendChild(el);
+                });
+            });
+        }
+
+        function selectCard(sel) {
+            selected = sel;
+            render();
+        }
+
+        function handleTableauClick(pileIdx, cardIdx) {
+            const pile = tableau[pileIdx];
+            const card = pile[cardIdx];
+            // Flip if facedown and top
+            if (!card.faceUp && cardIdx === pile.length -1) {
+                card.faceUp = true;
+                render();
+                return;
+            }
+
+            if (!card.faceUp) return;
+
+            if (!selected) {
+                pushUndo();
+                selected = {type:'tableau', pile: pileIdx, cardIndex: cardIdx};
+                render();
+                return;
+            }
+
+            // If selecting same pile top and faceDown handled above
+            // Move selected to this pile
+            const source = selected;
+            if (source.type === 'tableau' && source.pile === pileIdx && source.cardIndex === cardIdx) {
+                selected = null;
+                render();
+                return;
+            }
+
+            pushUndo();
+            const moving = takeFromPile(source);
+            if (!moving) { selected = null; render(); return; }
+            if (placeOnTarget(moving, {type:'tableau', pile: pileIdx})) {
+                moves++;
+                flipIfNeeded();
+                score -= 1;
+            } else {
+                // invalid, return cards
+                if (Array.isArray(moving)) {
+                    tableau[source.pile].splice(source.cardIndex, 0, ...moving);
+                } else {
+                    if (source.type === 'waste') waste.push(moving);
+                    else if (source.type === 'foundation') foundations[source.pile].push(moving);
+                }
+            }
+            selected = null;
+            render();
+        }
+
+        stockEl.addEventListener('click', () => {
+            drawStock();
+        });
+
+        // Clicking empty waste selects it for returning cards? We'll just ignore.
+
+        // Clicking empty tableau pile to move selected cards
+        tableauEl.querySelectorAll('.tableau-pile').forEach((pileEl, idx) => {
+            pileEl.addEventListener('click', (e) => {
+                if (!selected) return;
+                pushUndo();
+                const moving = takeFromPile(selected);
+                if (!moving) { selected = null; render(); return; }
+                if (placeOnTarget(moving, {type:'tableau', pile: idx})) {
+                    moves++;
+                    flipIfNeeded();
+                    score -= 1;
+                } else {
+                    // invalid, return
+                    if (Array.isArray(moving)) {
+                        tableau[selected.pile].splice(selected.cardIndex, 0, ...moving);
+                    } else {
+                        if (selected.type === 'waste') waste.push(moving);
+                        else if (selected.type === 'foundation') foundations[selected.pile].push(moving);
+                        else if (selected.type === 'tableau') tableau[selected.pile].push(moving);
+                    }
+                }
+                selected = null;
+                render();
+            });
+        });
+
+        foundationsEl.querySelectorAll('.foundation').forEach((fEl, idx) => {
+            fEl.addEventListener('click', () => {
+                if (!selected) return;
+                pushUndo();
+                const moving = takeFromPile(selected, true); // only top card
+                if (!moving) { selected = null; render(); return; }
+                if (placeOnTarget(moving, {type:'foundation', pile: idx})) {
+                    moves++;
+                    flipIfNeeded();
+                    score += 5;
+                } else {
+                    // invalid, return
+                    if (selected.type === 'waste') waste.push(moving);
+                    else if (selected.type === 'foundation') foundations[selected.pile].push(moving);
+                    else if (selected.type === 'tableau') tableau[selected.pile].push(moving);
+                }
+                selected = null;
+                render();
+            });
+            fEl.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                if (!selected) return;
+                pushUndo();
+                const moving = takeFromPile(selected, true);
+                if (!moving) { selected = null; render(); return; }
+                if (placeOnTarget(moving, {type:'foundation', pile: idx})) {
+                    moves++;
+                    flipIfNeeded();
+                    score += 5;
+                } else {
+                    if (selected.type === 'waste') waste.push(moving);
+                    else if (selected.type === 'foundation') foundations[selected.pile].push(moving);
+                    else if (selected.type === 'tableau') tableau[selected.pile].push(moving);
+                }
+                selected = null;
+                render();
+            });
+        });
+
+        newBtn.addEventListener('click', resetGame);
+        resetBtn.addEventListener('click', resetGame);
+        undoBtn?.addEventListener('click', () => {
+            if (popUndo()) render();
+        });
+        autoBtn?.addEventListener('click', () => {
+            autoComplete();
+        });
+        drawToggleBtn?.addEventListener('click', () => {
+            drawCount = drawCount === 1 ? 3 : 1;
+            render();
+        });
+
+        function autoComplete() {
+            let moved = false;
+            let safety = 0;
+            do {
+                moved = false;
+                safety++;
+                // Try tableau top cards
+                for (let t = 0; t < 7; t++) {
+                    const pile = tableau[t];
+                    if (pile.length === 0) continue;
+                    const top = pile[pile.length -1];
+                    if (!top.faceUp) continue;
+                    if (autoMoveToFoundation(top, {type:'tableau', pile: t, cardIndex: pile.length -1})) {
+                        moved = true; break;
+                    }
+                }
+                if (moved) continue;
+                // Try waste top
+                if (waste.length) {
+                    const topW = waste[waste.length -1];
+                    if (autoMoveToFoundation(topW, {type:'waste'})) {
+                        moved = true;
+                    }
+                }
+            } while (moved && safety < 300);
+            if (checkWin()) {
+                statusEl.textContent = 'You win!';
+                stopTimer();
+            }
+        }
+
+        function checkWin() {
+            return foundations.every(p => p.length === 13);
+        }
+
+        function invalidFeedback(el) {
+            if (!el) return;
+            el.classList.add('shake');
+            setTimeout(() => el.classList.remove('shake'), 250);
+        }
+
+        // Wrap placeOnTarget with feedback and win check
+        const origPlaceOnTarget = placeOnTarget;
+        placeOnTarget = function(item, target) {
+            const ok = origPlaceOnTarget(item, target);
+            if (!ok) {
+                const targetEl = target.type === 'foundation'
+                    ? foundationsEl.querySelectorAll('.foundation')[target.pile]
+                    : tableauEl.querySelectorAll('.tableau-pile')[target.pile];
+                invalidFeedback(targetEl);
+                score -= 1;
+            } else {
+                if (checkWin()) {
+                    statusEl.textContent = 'You win!';
+                    stopTimer();
+                }
+            }
+            return ok;
+        };
+    }
     openSkiFree() {
         const skifreeApp = document.getElementById('skifree-app');
         if (!skifreeApp) return;
@@ -840,6 +1906,33 @@ class ProgramManager {
         
         // Always bring to front when opening/clicking
         this.focusWindow(skifreeApp);
+    }
+
+    openDoom() {
+        const doomApp = document.getElementById('doom-app');
+        if (!doomApp) return;
+
+        if (doomApp.style.display === 'none' || !doomApp.style.display) {
+            doomApp.style.display = 'flex';
+            doomApp.style.left = `${70 + Math.random() * 80}px`;
+            doomApp.style.top = `${50 + Math.random() * 50}px`;
+            doomApp.style.width = '520px';
+            doomApp.style.height = '420px';
+            this.setupWindowDrag(doomApp);
+            this.setupSingleWindowControls(doomApp);
+            
+            // Remove from taskbar if it was there
+            this.removeFromTaskbar('doom-app');
+            
+            // Initialize game if not already initialized
+            if (!doomApp.dataset.initialized) {
+                this.initDoom();
+                doomApp.dataset.initialized = 'true';
+            }
+        }
+        
+        // Always bring to front when opening/clicking
+        this.focusWindow(doomApp);
     }
 
     initSkiFree() {
