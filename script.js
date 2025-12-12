@@ -1,4 +1,4 @@
-// Windows 3.1 Program Manager
+// Retro Program Manager
 
 class ProgramManager {
     constructor() {
@@ -24,7 +24,7 @@ class ProgramManager {
     getStandaloneWindowPosition() {
         // Position at top-left, flush with edge, below File menu
         // Title bar (20px) + Menu bar (padding + border) = ~42px from top
-        // Windows are positioned relative to .win31-desktop
+        // Windows are positioned relative to .retro-desktop
         return { left: 0, top: 42 };
     }
 
@@ -580,6 +580,11 @@ class ProgramManager {
         this.setupDesktopClock();
         this.updateStatusBar();
         setInterval(() => this.updateStatusBar(), 1000);
+        
+        // Load startup programs after a short delay
+        setTimeout(() => {
+            this.loadStartupPrograms();
+        }, 500);
     }
 
     setupDesktopClock() {
@@ -854,7 +859,7 @@ class ProgramManager {
                 e.target.closest('.desktop-taskbar') || 
                 e.target.closest('.desktop-status-bar') ||
                 e.target.closest('.program-manager') ||
-                e.target.classList.contains('win31-desktop') ||
+                e.target.classList.contains('retro-desktop') ||
                 e.target.classList.contains('screen-content')) {
                 document.querySelectorAll('.desktop-icon, .minimized-program-manager').forEach(i => i.classList.remove('selected'));
             }
@@ -1103,7 +1108,7 @@ class ProgramManager {
                 const responses = [
                     "That's an interesting question! In the retro computing era, we would have consulted manuals and documentation.",
                     "Processing your request... Please wait while I search through my knowledge base.",
-                    "I'm a retro AI assistant from the Windows 3.1 era. My capabilities are limited compared to modern AI, but I'll do my best!",
+                    "I'm a retro AI assistant from the classic computing era. My capabilities are limited compared to modern AI, but I'll do my best!",
                     "Let me check my database... Hmm, that's a complex query. Would you like me to search for more information?",
                     "In the classic computing days, we relied on command-line interfaces and text-based systems. Your question reminds me of those times!",
                     "I'm processing your request using vintage algorithms. This might take a moment...",
@@ -1424,6 +1429,56 @@ class ProgramManager {
                     this.openAccessory(app);
                 }
             });
+
+            // Right-click context menu to add/remove from startup
+            icon.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                const app = icon.dataset.app;
+                if (!app) return;
+                
+                // Determine app ID
+                let appId = app;
+                if (app === 'write' || app === 'paintbrush' || app === 'terminal' || 
+                    app === 'notepad' || app === 'recorder' || app === 'calendar' ||
+                    app === 'calculator' || app === 'clock' || app === 'object-packager' ||
+                    app === 'character-map' || app === 'media-player' || 
+                    app === 'sound-recorder' || app === 'cardfile') {
+                    appId = `accessory-${app}`;
+                }
+                
+                const isInStartup = this.isInStartup(appId);
+                const menu = document.createElement('div');
+                menu.className = 'dropdown-menu';
+                menu.innerHTML = isInStartup 
+                    ? `<div class="menu-option" data-action="remove-startup">Remove from StartUp</div>`
+                    : `<div class="menu-option" data-action="add-startup">Add to StartUp</div>`;
+                
+                const rect = icon.getBoundingClientRect();
+                menu.style.left = `${rect.left}px`;
+                menu.style.top = `${rect.bottom}px`;
+                
+                menu.querySelector('.menu-option').addEventListener('click', () => {
+                    if (isInStartup) {
+                        this.removeFromStartup(appId);
+                    } else {
+                        this.addToStartup(appId);
+                    }
+                    menu.remove();
+                });
+                
+                document.body.appendChild(menu);
+                
+                // Close on outside click
+                setTimeout(() => {
+                    const closeHandler = (e) => {
+                        if (!menu.contains(e.target) && !icon.contains(e.target)) {
+                            menu.remove();
+                            document.removeEventListener('click', closeHandler);
+                        }
+                    };
+                    document.addEventListener('click', closeHandler);
+                }, 0);
+            });
         });
     }
 
@@ -1523,7 +1578,7 @@ class ProgramManager {
                 </div>`,
             'notepad': `
                 <div class="notepad-app">
-                    <div class="notepad-menu">
+                    <div class="notepad-menu-bar">
                         <span class="menu-item"><u>F</u>ile</span>
                         <span class="menu-item"><u>E</u>dit</span>
                         <span class="menu-item"><u>S</u>earch</span>
@@ -1533,7 +1588,7 @@ class ProgramManager {
                 </div>`,
             'terminal': `
                 <div class="terminal-app">
-                    <div class="terminal-output" id="terminal-output">Microsoft(R) MS-DOS(R) Version 6.22<br>(C)Copyright Microsoft Corp 1981-1994.<br><br>C:\\WINDOWS></div>
+                    <div class="terminal-output" id="terminal-output">DOS Version 6.22<br>(C)Copyright 1981-1994.<br><br>C:\\SYSTEM></div>
                     <div class="terminal-input-line">
                         <span class="terminal-prompt">C:\\WINDOWS></span>
                         <input type="text" class="terminal-input" id="terminal-input" autofocus>
@@ -1553,6 +1608,14 @@ class ProgramManager {
                 </div>`,
             'write': `
                 <div class="write-app">
+                    <div class="write-menu-bar">
+                        <span class="menu-item"><u>F</u>ile</span>
+                        <span class="menu-item"><u>E</u>dit</span>
+                        <span class="menu-item"><u>Ch</u>aracter</span>
+                        <span class="menu-item"><u>P</u>aragraph</span>
+                        <span class="menu-item"><u>D</u>ocument</span>
+                        <span class="menu-item"><u>H</u>elp</span>
+                    </div>
                     <div class="write-toolbar">
                         <button class="write-btn" data-cmd="bold"><b>B</b></button>
                         <button class="write-btn" data-cmd="italic"><i>I</i></button>
@@ -1566,6 +1629,13 @@ class ProgramManager {
                 </div>`,
             'paintbrush': `
                 <div class="paintbrush-app">
+                    <div class="paint-menu-bar">
+                        <span class="menu-item"><u>F</u>ile</span>
+                        <span class="menu-item"><u>E</u>dit</span>
+                        <span class="menu-item"><u>V</u>iew</span>
+                        <span class="menu-item"><u>O</u>ptions</span>
+                        <span class="menu-item"><u>H</u>elp</span>
+                    </div>
                     <div class="paint-toolbar">
                         <div class="paint-tools">
                             <button class="paint-tool active" data-tool="brush" title="Brush">🖌</button>
@@ -1597,6 +1667,12 @@ class ProgramManager {
                 </div>`,
             'media-player': `
                 <div class="mediaplayer-app">
+                    <div class="mp-menu-bar">
+                        <span class="menu-item"><u>F</u>ile</span>
+                        <span class="menu-item"><u>D</u>evice</span>
+                        <span class="menu-item"><u>S</u>cale</span>
+                        <span class="menu-item"><u>H</u>elp</span>
+                    </div>
                     <div class="mp-display">
                         <span class="mp-title">No file loaded</span>
                         <span class="mp-time">00:00 / 00:00</span>
@@ -1615,6 +1691,12 @@ class ProgramManager {
                 </div>`,
             'sound-recorder': `
                 <div class="soundrec-app">
+                    <div class="sr-menu-bar">
+                        <span class="menu-item"><u>F</u>ile</span>
+                        <span class="menu-item"><u>E</u>dit</span>
+                        <span class="menu-item"><u>E</u>ffects</span>
+                        <span class="menu-item"><u>H</u>elp</span>
+                    </div>
                     <div class="sr-display">
                         <canvas class="sr-waveform" width="300" height="60"></canvas>
                         <span class="sr-time">00:00.00</span>
@@ -1629,6 +1711,13 @@ class ProgramManager {
                 </div>`,
             'cardfile': `
                 <div class="cardfile-app">
+                    <div class="cf-menu-bar">
+                        <span class="menu-item"><u>F</u>ile</span>
+                        <span class="menu-item"><u>E</u>dit</span>
+                        <span class="menu-item"><u>V</u>iew</span>
+                        <span class="menu-item"><u>C</u>ard</span>
+                        <span class="menu-item"><u>H</u>elp</span>
+                    </div>
                     <div class="cf-tabs" id="cf-tabs">
                         <div class="cf-tab active" data-index="0">A</div>
                         <div class="cf-tab" data-index="1">B</div>
@@ -1644,6 +1733,12 @@ Address: 123 Main St</textarea>
                 </div>`,
             'recorder': `
                 <div class="recorder-app">
+                    <div class="rec-menu-bar">
+                        <span class="menu-item"><u>F</u>ile</span>
+                        <span class="menu-item"><u>M</u>acro</span>
+                        <span class="menu-item"><u>O</u>ptions</span>
+                        <span class="menu-item"><u>H</u>elp</span>
+                    </div>
                     <div class="rec-status">Ready to record macros</div>
                     <div class="rec-controls">
                         <button class="rec-btn" data-action="record">⏺ Record</button>
@@ -1657,11 +1752,16 @@ Address: 123 Main St</textarea>
                 </div>`,
             'object-packager': `
                 <div class="packager-app">
+                    <div class="pkg-menu-bar">
+                        <span class="menu-item"><u>F</u>ile</span>
+                        <span class="menu-item"><u>E</u>dit</span>
+                        <span class="menu-item"><u>H</u>elp</span>
+                    </div>
                     <div class="pkg-icon">📦</div>
                     <div class="pkg-text">Drag and drop a file here<br>to create a package</div>
                     <div class="pkg-buttons">
-                        <button class="pkg-btn">Import...</button>
-                        <button class="pkg-btn">Export...</button>
+                        <button class="pkg-btn" data-action="import">Import...</button>
+                        <button class="pkg-btn" data-action="export">Export...</button>
                     </div>
                 </div>`
         };
@@ -1686,6 +1786,143 @@ Address: 123 Main St</textarea>
         return sizes[appName] || { width: 400, height: 300 };
     }
 
+    showFileDialog(mode, appName, callback) {
+        const dialog = document.getElementById('file-dialog');
+        const title = dialog.querySelector('#file-dialog-title');
+        const filename = dialog.querySelector('#file-dialog-filename');
+        const okBtn = dialog.querySelector('#file-dialog-ok');
+        const cancelBtn = dialog.querySelector('#file-dialog-cancel');
+        const closeBtn = dialog.querySelector('#file-dialog-close');
+        
+        title.textContent = mode === 'save' ? 'Save As' : 'Open';
+        filename.value = mode === 'save' ? 'UNTITLED' : '';
+        dialog.style.display = 'flex';
+        
+        const close = () => dialog.style.display = 'none';
+        
+        okBtn.onclick = () => {
+            const name = filename.value || 'UNTITLED';
+            close();
+            callback(name);
+        };
+        
+        cancelBtn.onclick = close;
+        closeBtn.onclick = close;
+        
+        // Close on escape
+        const escapeHandler = (e) => {
+            if (e.key === 'Escape') {
+                close();
+                document.removeEventListener('keydown', escapeHandler);
+            }
+        };
+        document.addEventListener('keydown', escapeHandler);
+    }
+
+    async saveFile(content, filename, mimeType) {
+        try {
+            if ('showSaveFilePicker' in window) {
+                const fileHandle = await window.showSaveFilePicker({
+                    suggestedName: filename,
+                    types: [{
+                        description: 'File',
+                        accept: { [mimeType]: ['.txt', '.html', '.wri', '.bmp', '.png', '.wav', '.rec', '.crd'] }
+                    }]
+                });
+                const writable = await fileHandle.createWritable();
+                if (content instanceof Blob) {
+                    await writable.write(content);
+                } else {
+                    await writable.write(content);
+                }
+                await writable.close();
+            } else {
+                let blob;
+                if (content instanceof Blob) {
+                    blob = content;
+                } else {
+                    blob = new Blob([content], { type: mimeType });
+                }
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                console.error('Save failed:', err);
+            }
+        }
+    }
+
+    async loadFile(mimeTypes) {
+        try {
+            if ('showOpenFilePicker' in window) {
+                const [fileHandle] = await window.showOpenFilePicker({
+                    types: [{ accept: mimeTypes }]
+                });
+                const file = await fileHandle.getFile();
+                return file;
+            } else {
+                return new Promise((resolve) => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = Object.keys(mimeTypes).map(key => mimeTypes[key].join(',')).join(',');
+                    input.onchange = async (e) => {
+                        const file = e.target.files[0];
+                        if (file) resolve(file);
+                        else resolve(null);
+                    };
+                    input.click();
+                });
+            }
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                console.error('Load failed:', err);
+            }
+            return null;
+        }
+    }
+
+    showMenu(menuItem, menuItems, callback) {
+        // Remove existing menus
+        document.querySelectorAll('.dropdown-menu').forEach(m => m.remove());
+        
+        const menu = document.createElement('div');
+        menu.className = 'dropdown-menu';
+        menu.innerHTML = menuItems.map(item => 
+            `<div class="menu-option ${item.disabled ? 'disabled' : ''}" data-action="${item.action}">${item.label}</div>`
+        ).join('');
+        
+        const rect = menuItem.getBoundingClientRect();
+        menu.style.left = `${rect.left}px`;
+        menu.style.top = `${rect.bottom}px`;
+        
+        menu.querySelectorAll('.menu-option').forEach(opt => {
+            if (!opt.classList.contains('disabled')) {
+                opt.addEventListener('click', () => {
+                    callback(opt.dataset.action);
+                    menu.remove();
+                });
+            }
+        });
+        
+        document.body.appendChild(menu);
+        
+        // Close on outside click
+        setTimeout(() => {
+            const closeHandler = (e) => {
+                if (!menu.contains(e.target) && !menuItem.contains(e.target)) {
+                    menu.remove();
+                    document.removeEventListener('click', closeHandler);
+                }
+            };
+            document.addEventListener('click', closeHandler);
+        }, 0);
+    }
+
     initAccessory(appName, appWindow) {
         if (appName === 'calculator') {
             this.initCalculator(appWindow);
@@ -1699,6 +1936,18 @@ Address: 123 Main St</textarea>
             this.initCharacterMap(appWindow);
         } else if (appName === 'write') {
             this.initWrite(appWindow);
+        } else if (appName === 'notepad') {
+            this.initNotepad(appWindow);
+        } else if (appName === 'cardfile') {
+            this.initCardfile(appWindow);
+        } else if (appName === 'media-player') {
+            this.initMediaPlayer(appWindow);
+        } else if (appName === 'sound-recorder') {
+            this.initSoundRecorder(appWindow);
+        } else if (appName === 'recorder') {
+            this.initRecorder(appWindow);
+        } else if (appName === 'object-packager') {
+            this.initObjectPackager(appWindow);
         }
     }
 
@@ -1758,11 +2007,11 @@ Address: 123 Main St</textarea>
         const input = appWindow.querySelector('#terminal-input');
         const commands = {
             'help': 'Available commands: help, dir, cls, date, time, ver, echo, type',
-            'dir': 'Volume in drive C is WINDOWS\n Directory of C:\\WINDOWS\n\n.              <DIR>\n..             <DIR>\nSYSTEM         <DIR>\nWIN.INI           2048\nSYSTEM.INI        1536\n     2 File(s)     3,584 bytes\n     3 Dir(s)  104,857,600 bytes free',
+            'dir': 'Volume in drive C is SYSTEM\n Directory of C:\\SYSTEM\n\n.              <DIR>\n..             <DIR>\nAPPS           <DIR>\nCONFIG.INI        2048\nSYSTEM.INI        1536\n     2 File(s)     3,584 bytes\n     3 Dir(s)  104,857,600 bytes free',
             'cls': '__CLEAR__',
             'date': `Current date is ${new Date().toLocaleDateString()}`,
             'time': `Current time is ${new Date().toLocaleTimeString()}`,
-            'ver': 'MS-DOS Version 6.22',
+            'ver': 'DOS Version 6.22',
         };
 
         input.addEventListener('keydown', (e) => {
@@ -1773,17 +2022,17 @@ Address: 123 Main St</textarea>
                 if (cmd.startsWith('echo ')) {
                     response = cmd.slice(5);
                 } else if (commands[cmd]) {
-                    if (commands[cmd] === '__CLEAR__') {
-                        output.innerHTML = 'C:\\WINDOWS>';
-                        input.value = '';
-                        return;
-                    }
+                if (commands[cmd] === '__CLEAR__') {
+                    output.innerHTML = 'C:\\SYSTEM>';
+                    input.value = '';
+                    return;
+                }
                     response = commands[cmd];
                 } else if (cmd) {
                     response = `Bad command or file name`;
                 }
                 
-                output.innerHTML += input.value + '<br>' + (response ? response.replace(/\n/g, '<br>') + '<br>' : '') + '<br>C:\\WINDOWS>';
+                output.innerHTML += input.value + '<br>' + (response ? response.replace(/\n/g, '<br>') + '<br>' : '') + '<br>C:\\SYSTEM>';
                 input.value = '';
                 output.scrollTop = output.scrollHeight;
             }
@@ -1829,6 +2078,7 @@ Address: 123 Main St</textarea>
         let color = '#000000';
         let brushSize = 5;
         let tool = 'brush';
+        let currentFile = null;
 
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1867,6 +2117,43 @@ Address: 123 Main St</textarea>
         });
 
         appWindow.querySelector('.paint-size').addEventListener('input', (e) => brushSize = e.target.value);
+
+        // File menu
+        const fileMenu = appWindow.querySelector('.paint-menu-bar .menu-item');
+        if (fileMenu && fileMenu.textContent.includes('File')) {
+            fileMenu.addEventListener('click', () => {
+                this.showMenu(fileMenu, [
+                    { action: 'new', label: 'New' },
+                    { action: 'open', label: 'Open...' },
+                    { action: 'save', label: 'Save' },
+                    { action: 'saveas', label: 'Save As...' }
+                ], async (action) => {
+                    if (action === 'save' || action === 'saveas') {
+                        this.showFileDialog('save', 'paintbrush', (filename) => {
+                            canvas.toBlob((blob) => {
+                                this.saveFile(blob, filename + '.bmp', 'image/bmp');
+                                currentFile = filename;
+                            }, 'image/bmp');
+                        });
+                    } else if (action === 'open') {
+                        const file = await this.loadFile({ 'image/*': ['.bmp', '.png', '.jpg'] });
+                        if (file) {
+                            const img = new Image();
+                            img.onload = () => {
+                                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                                ctx.drawImage(img, 0, 0);
+                            };
+                            img.src = URL.createObjectURL(file);
+                            currentFile = file.name.replace(/\.[^/.]+$/, '');
+                        }
+                    } else if (action === 'new') {
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        currentFile = null;
+                    }
+                });
+            });
+        }
     }
 
     initCharacterMap(appWindow) {
@@ -1895,11 +2182,221 @@ Address: 123 Main St</textarea>
     }
 
     initWrite(appWindow) {
+        const editor = appWindow.querySelector('.write-editor');
+        let currentFile = null;
+        
         appWindow.querySelectorAll('.write-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.execCommand(btn.dataset.cmd, false, null);
             });
         });
+        
+        // File menu
+        const fileMenu = appWindow.querySelector('.write-menu-bar .menu-item');
+        if (fileMenu && fileMenu.textContent.includes('File')) {
+            fileMenu.addEventListener('click', () => {
+                this.showMenu(fileMenu, [
+                    { action: 'new', label: 'New' },
+                    { action: 'open', label: 'Open...' },
+                    { action: 'save', label: 'Save' },
+                    { action: 'saveas', label: 'Save As...' }
+                ], async (action) => {
+                    if (action === 'save' || action === 'saveas') {
+                        this.showFileDialog('save', 'write', (filename) => {
+                            const content = editor.innerHTML;
+                            this.saveFile(content, filename + '.wri', 'text/html');
+                            currentFile = filename;
+                        });
+                    } else if (action === 'open') {
+                        const file = await this.loadFile({ 'text/html': ['.wri', '.html', '.txt'] });
+                        if (file) {
+                            const text = await file.text();
+                            editor.innerHTML = text;
+                            currentFile = file.name.replace(/\.[^/.]+$/, '');
+                        }
+                    } else if (action === 'new') {
+                        editor.innerHTML = '';
+                        currentFile = null;
+                    }
+                });
+            });
+        }
+    }
+
+    initCardfile(appWindow) {
+        const title = appWindow.querySelector('.cf-title');
+        const content = appWindow.querySelector('.cf-content');
+        let currentFile = null;
+        
+        const fileMenu = appWindow.querySelector('.cf-menu-bar .menu-item');
+        if (fileMenu && fileMenu.textContent.includes('File')) {
+            fileMenu.addEventListener('click', () => {
+                this.showMenu(fileMenu, [
+                    { action: 'new', label: 'New' },
+                    { action: 'open', label: 'Open...' },
+                    { action: 'save', label: 'Save' },
+                    { action: 'saveas', label: 'Save As...' }
+                ], async (action) => {
+                    if (action === 'save' || action === 'saveas') {
+                        this.showFileDialog('save', 'cardfile', (filename) => {
+                            const data = JSON.stringify({ title: title.value, content: content.value });
+                            this.saveFile(data, filename + '.crd', 'application/json');
+                            currentFile = filename;
+                        });
+                    } else if (action === 'open') {
+                        const file = await this.loadFile({ 'application/json': ['.crd'] });
+                        if (file) {
+                            const text = await file.text();
+                            const data = JSON.parse(text);
+                            title.value = data.title || '';
+                            content.value = data.content || '';
+                            currentFile = file.name.replace(/\.[^/.]+$/, '');
+                        }
+                    } else if (action === 'new') {
+                        title.value = '';
+                        content.value = '';
+                        currentFile = null;
+                    }
+                });
+            });
+        }
+    }
+
+    initMediaPlayer(appWindow) {
+        const title = appWindow.querySelector('.mp-title');
+        let currentFile = null;
+        
+        const fileMenu = appWindow.querySelector('.mp-menu-bar .menu-item');
+        if (fileMenu && fileMenu.textContent.includes('File')) {
+            fileMenu.addEventListener('click', () => {
+                this.showMenu(fileMenu, [
+                    { action: 'open', label: 'Open...' }
+                ], async (action) => {
+                    if (action === 'open') {
+                        const file = await this.loadFile({ 'audio/*': ['.wav', '.mp3'], 'video/*': ['.avi', '.mp4'] });
+                        if (file) {
+                            title.textContent = file.name;
+                            currentFile = file;
+                            // In a real implementation, you'd load and play the media file
+                        }
+                    }
+                });
+            });
+        }
+    }
+
+    initSoundRecorder(appWindow) {
+        let currentFile = null;
+        
+        const fileMenu = appWindow.querySelector('.sr-menu-bar .menu-item');
+        if (fileMenu && fileMenu.textContent.includes('File')) {
+            fileMenu.addEventListener('click', () => {
+                this.showMenu(fileMenu, [
+                    { action: 'new', label: 'New' },
+                    { action: 'open', label: 'Open...' },
+                    { action: 'save', label: 'Save' },
+                    { action: 'saveas', label: 'Save As...' }
+                ], async (action) => {
+                    if (action === 'save' || action === 'saveas') {
+                        this.showFileDialog('save', 'sound-recorder', (filename) => {
+                            // In a real implementation, you'd save the recorded audio
+                            // For now, create a placeholder
+                            const blob = new Blob([''], { type: 'audio/wav' });
+                            this.saveFile(blob, filename + '.wav', 'audio/wav');
+                            currentFile = filename;
+                        });
+                    } else if (action === 'open') {
+                        const file = await this.loadFile({ 'audio/*': ['.wav'] });
+                        if (file) {
+                            currentFile = file;
+                            // In a real implementation, you'd load and play the audio
+                        }
+                    } else if (action === 'new') {
+                        currentFile = null;
+                    }
+                });
+            });
+        }
+    }
+
+    initRecorder(appWindow) {
+        let currentFile = null;
+        
+        const fileMenu = appWindow.querySelector('.rec-menu-bar .menu-item');
+        if (fileMenu && fileMenu.textContent.includes('File')) {
+            fileMenu.addEventListener('click', () => {
+                this.showMenu(fileMenu, [
+                    { action: 'new', label: 'New' },
+                    { action: 'open', label: 'Open...' },
+                    { action: 'save', label: 'Save' },
+                    { action: 'saveas', label: 'Save As...' }
+                ], async (action) => {
+                    if (action === 'save' || action === 'saveas') {
+                        this.showFileDialog('save', 'recorder', (filename) => {
+                            // Save macro data
+                            const macroData = JSON.stringify({ macros: [] });
+                            this.saveFile(macroData, filename + '.rec', 'application/json');
+                            currentFile = filename;
+                        });
+                    } else if (action === 'open') {
+                        const file = await this.loadFile({ 'application/json': ['.rec'] });
+                        if (file) {
+                            currentFile = file;
+                            // In a real implementation, you'd load the macros
+                        }
+                    } else if (action === 'new') {
+                        currentFile = null;
+                    }
+                });
+            });
+        }
+    }
+
+    initObjectPackager(appWindow) {
+        const importBtn = appWindow.querySelector('.pkg-btn[data-action="import"]');
+        const exportBtn = appWindow.querySelector('.pkg-btn[data-action="export"]');
+        
+        if (importBtn) {
+            importBtn.addEventListener('click', async () => {
+                const file = await this.loadFile({ '*/*': ['.*'] });
+                if (file) {
+                    // In a real implementation, you'd import the file
+                    appWindow.querySelector('.pkg-text').textContent = `Package: ${file.name}`;
+                }
+            });
+        }
+        
+        if (exportBtn) {
+            exportBtn.addEventListener('click', () => {
+                this.showFileDialog('save', 'object-packager', (filename) => {
+                    // In a real implementation, you'd export the package
+                    const blob = new Blob([''], { type: 'application/octet-stream' });
+                    this.saveFile(blob, filename + '.pkg', 'application/octet-stream');
+                });
+            });
+        }
+        
+        const fileMenu = appWindow.querySelector('.pkg-menu-bar .menu-item');
+        if (fileMenu && fileMenu.textContent.includes('File')) {
+            fileMenu.addEventListener('click', () => {
+                this.showMenu(fileMenu, [
+                    { action: 'import', label: 'Import...' },
+                    { action: 'export', label: 'Export...' }
+                ], async (action) => {
+                    if (action === 'import') {
+                        const file = await this.loadFile({ '*/*': ['.*'] });
+                        if (file) {
+                            appWindow.querySelector('.pkg-text').textContent = `Package: ${file.name}`;
+                        }
+                    } else if (action === 'export') {
+                        this.showFileDialog('save', 'object-packager', (filename) => {
+                            const blob = new Blob([''], { type: 'application/octet-stream' });
+                            this.saveFile(blob, filename + '.pkg', 'application/octet-stream');
+                        });
+                    }
+                });
+            });
+        }
     }
 
     openAccessory(appName) {
@@ -1936,7 +2433,7 @@ Address: 123 Main St</textarea>
         let appWindow = document.getElementById(windowId);
         
         if (!appWindow) {
-            const screenContent = document.querySelector('.win31-desktop');
+            const screenContent = document.querySelector('.retro-desktop');
             if (!screenContent) return;
             
             appWindow = document.createElement('div');
@@ -3883,9 +4380,127 @@ Address: 123 Main St</textarea>
                 this.setupSingleWindowControls(win);
                 // Remove from taskbar if it was there
                 this.removeFromTaskbar(windowId);
+                
+                // Update startup window if it's startup
+                if (groupId === 'startup') {
+                    this.updateStartupWindow();
+                }
             }
             this.focusWindow(win);
         }
+    }
+
+    loadStartupPrograms() {
+        const startupPrograms = JSON.parse(localStorage.getItem('startupPrograms') || '[]');
+        startupPrograms.forEach(appId => {
+            // Small delay between launches for better UX
+            setTimeout(() => {
+                if (appId === 'minesweeper') this.openMinesweeper();
+                else if (appId === 'skifree') this.openSkiFree();
+                else if (appId === 'solitaire') this.openSolitaire();
+                else if (appId === 'doom') this.openDoom();
+                else if (appId === 'readme') this.openReadme();
+                else if (appId === 'clock') {
+                    const clockWindow = document.getElementById('desktop-clock');
+                    if (clockWindow) {
+                        clockWindow.style.display = 'flex';
+                        this.focusWindow(clockWindow);
+                    }
+                } else if (appId.startsWith('accessory-')) {
+                    const appName = appId.replace('accessory-', '');
+                    this.openAccessory(appName);
+                }
+            }, startupPrograms.indexOf(appId) * 300);
+        });
+    }
+
+    addToStartup(appId) {
+        let startupPrograms = JSON.parse(localStorage.getItem('startupPrograms') || '[]');
+        if (!startupPrograms.includes(appId)) {
+            startupPrograms.push(appId);
+            localStorage.setItem('startupPrograms', JSON.stringify(startupPrograms));
+            this.updateStartupWindow();
+        }
+    }
+
+    removeFromStartup(appId) {
+        let startupPrograms = JSON.parse(localStorage.getItem('startupPrograms') || '[]');
+        startupPrograms = startupPrograms.filter(id => id !== appId);
+        localStorage.setItem('startupPrograms', JSON.stringify(startupPrograms));
+        this.updateStartupWindow();
+    }
+
+    isInStartup(appId) {
+        const startupPrograms = JSON.parse(localStorage.getItem('startupPrograms') || '[]');
+        return startupPrograms.includes(appId);
+    }
+
+    updateStartupWindow() {
+        const startupContent = document.getElementById('startup-content');
+        if (!startupContent) return;
+        
+        const startupPrograms = JSON.parse(localStorage.getItem('startupPrograms') || '[]');
+        startupContent.innerHTML = '';
+        
+        const appIcons = {
+            'minesweeper': { icon: 'minesweeper-icon', label: 'Minesweeper' },
+            'skifree': { icon: 'skifree-icon', label: 'SkiFree' },
+            'solitaire': { icon: 'solitaire-icon', label: 'Solitaire' },
+            'doom': { icon: 'doom-icon', label: 'Doom' },
+            'readme': { icon: 'readme-icon', label: 'Read Me' },
+            'clock': { icon: 'clock-icon', label: 'Clock' },
+            'write': { icon: 'write-icon', label: 'Write' },
+            'paintbrush': { icon: 'paintbrush-icon', label: 'Paintbrush' },
+            'notepad': { icon: 'notepad-icon', label: 'Notepad' },
+            'calculator': { icon: 'calculator-icon', label: 'Calculator' },
+            'calendar': { icon: 'calendar-icon', label: 'Calendar' },
+            'terminal': { icon: 'terminal-icon', label: 'Terminal' }
+        };
+        
+        startupPrograms.forEach(appId => {
+            let app;
+            if (appId.startsWith('accessory-')) {
+                const appName = appId.replace('accessory-', '');
+                const accessoryIcons = {
+                    'write': { icon: 'write-icon', label: 'Write' },
+                    'paintbrush': { icon: 'paintbrush-icon', label: 'Paintbrush' },
+                    'notepad': { icon: 'notepad-icon', label: 'Notepad' },
+                    'calculator': { icon: 'calculator-icon', label: 'Calculator' },
+                    'calendar': { icon: 'calendar-icon', label: 'Calendar' },
+                    'terminal': { icon: 'terminal-icon', label: 'Terminal' },
+                    'character-map': { icon: 'charmap-icon', label: 'Character Map' },
+                    'media-player': { icon: 'mediaplayer-icon', label: 'Media Player' },
+                    'sound-recorder': { icon: 'soundrec-icon', label: 'Sound Recorder' },
+                    'cardfile': { icon: 'cardfile-icon', label: 'Cardfile' },
+                    'recorder': { icon: 'recorder-icon', label: 'Recorder' },
+                    'object-packager': { icon: 'packager-icon', label: 'Object Packager' }
+                };
+                app = accessoryIcons[appName] || { icon: 'mini-window-icon', label: appName };
+            } else {
+                app = appIcons[appId] || { icon: 'mini-window-icon', label: appId };
+            }
+            
+            const icon = document.createElement('div');
+            icon.className = 'program-icon';
+            icon.dataset.app = appId;
+            icon.innerHTML = `
+                <div class="app-icon ${app.icon}"></div>
+                <div class="program-icon-label">${app.label}</div>
+            `;
+            
+            // Double-click to remove from startup
+            icon.addEventListener('dblclick', () => {
+                this.removeFromStartup(appId);
+            });
+            
+            // Right-click to remove
+            icon.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                this.removeFromStartup(appId);
+            });
+            
+            startupContent.appendChild(icon);
+        });
     }
 
     setupSingleWindowControls(win) {
@@ -3975,8 +4590,8 @@ Address: 123 Main St</textarea>
             if (win.classList.contains('mdi-child')) {
                 parentContainer = win.closest('.program-manager-content');
             } else {
-                // Standalone windows are positioned relative to .win31-desktop
-                parentContainer = win.closest('.win31-desktop') || document.querySelector('.win31-desktop');
+                // Standalone windows are positioned relative to .retro-desktop
+                parentContainer = win.closest('.retro-desktop') || document.querySelector('.retro-desktop');
             }
             
             if (parentContainer) {
@@ -4003,8 +4618,8 @@ Address: 123 Main St</textarea>
             if (win.classList.contains('mdi-child')) {
                 parentContainer = win.closest('.program-manager-content');
             } else {
-                // Standalone windows are positioned relative to .win31-desktop
-                parentContainer = win.closest('.win31-desktop') || document.querySelector('.win31-desktop');
+                // Standalone windows are positioned relative to .retro-desktop
+                parentContainer = win.closest('.retro-desktop') || document.querySelector('.retro-desktop');
             }
             
             if (!parentContainer) return;

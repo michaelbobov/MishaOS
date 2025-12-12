@@ -1,6 +1,6 @@
 # MishaOS
 
-A Windows 3.1-inspired operating system interface with retro games and interactive elements.
+A retro operating system interface inspired by classic computing with games and interactive elements.
 
 ## About Me
 

@@ -8,9 +8,21 @@
 </head>
 <body>
     <div class="room-background">
+        <div class="sticky-note-wrapper">
+            <img
+                class="sticky-note sticky-note-flat"
+                src="assets/stickynote.png"
+                alt="Sticky note"
+                loading="eager">
+            <img
+                class="sticky-note sticky-note-bent"
+                src="assets/postitbend.png"
+                alt="Sticky note bent"
+                loading="eager">
+        </div>
         <div class="crt-monitor">
             <div class="monitor-screen">
-                <div class="screen-content win31-desktop">
+                <div class="screen-content retro-desktop">
                     <!-- Desktop Icons (top left) -->
                     <div class="desktop-icons-area">
                         <!-- Program Manager icon (when minimized) will appear here -->
@@ -153,7 +165,7 @@
                                     </div>
                                     <div class="program-icon" data-app="dos-prompt">
                                         <div class="app-icon dos-icon"></div>
-                                        <div class="program-icon-label">MS-DOS<br>Prompt</div>
+                                        <div class="program-icon-label">DOS<br>Prompt</div>
                                     </div>
                                     <div class="program-icon" data-app="setup">
                                         <div class="app-icon setup-icon"></div>
@@ -263,6 +275,21 @@
                                         <div class="app-icon cardfile-icon"></div>
                                         <div class="program-icon-label">Cardfile</div>
                                     </div>
+                                </div>
+                            </div>
+
+                            <!-- Startup Program Group Window -->
+                            <div class="program-group-window mdi-child" id="startup-window" style="display: none;">
+                                <div class="window-titlebar">
+                                    <div class="system-menu">─</div>
+                                    <span class="window-title">StartUp</span>
+                                    <div class="window-controls">
+                                        <button class="window-btn">▼</button>
+                                        <button class="window-btn">▲</button>
+                                    </div>
+                                </div>
+                                <div class="program-group-content" id="startup-content">
+                                    <!-- Programs in startup will appear here dynamically -->
                                 </div>
                             </div>
                             
@@ -423,7 +450,7 @@
                             </div>
                         </div>
                         <div class="window-content">
-                            <div style="padding: 16px; font-family: 'MS Sans Serif', Tahoma, sans-serif; font-size: 12px; line-height: 1.6; color: var(--win-text); overflow-y: auto; height: 100%;">
+                            <div style="padding: 16px; font-family: Tahoma, sans-serif; font-size: 12px; line-height: 1.6; color: var(--win-text); overflow-y: auto; height: 100%;">
                                 <p style="margin-bottom: 12px; font-style: italic;">
                                     Oh, glad you found this little easter egg!
                                 </p>
@@ -435,7 +462,7 @@
                                     I'm Russian American with a deep love for Japan, which you'll notice in the music, visual style, and atmosphere of the project. More than anything, I'm a maker. I love building things—especially with Cursor—and this project reflects that. It's not just design; it's hands-on experimentation, development, and world-building to bring this multi-era retro OS to life.
                                 </p>
                                 <p style="margin-bottom: 12px;">
-                                    There's a lot to explore: poke around the desktop, try out the retro-styled AI chat, dive into different system eras by clicking the year in the bottom bar, check out apps inspired by Windows 3.1, play a few games, or even open the VHS player for music and surprises.
+                                    There's a lot to explore: poke around the desktop, try out the retro-styled AI chat, dive into different system eras by clicking the year in the bottom bar, check out apps inspired by classic operating systems, play a few games, or even open the VHS player for music and surprises.
                                 </p>
                                 <p>
                                     I hope you enjoy exploring this little time capsule as much as I enjoyed creating it.
@@ -481,6 +508,34 @@
                         <div class="system-menu-item" data-action="close"><u>C</u>lose<span class="shortcut">Alt+F4</span></div>
                         <div class="system-menu-separator"></div>
                         <div class="system-menu-item" data-action="switch-to">Switch To...<span class="shortcut">Ctrl+Esc</span></div>
+                    </div>
+
+                    <!-- File Dialog -->
+                    <div class="file-dialog" id="file-dialog" style="display: none;">
+                        <div class="file-dialog-titlebar">
+                            <span class="file-dialog-title" id="file-dialog-title">Save As</span>
+                            <button class="file-dialog-close" id="file-dialog-close">×</button>
+                        </div>
+                        <div class="file-dialog-content">
+                            <div class="file-dialog-path">
+                                <label>File Name:</label>
+                                <input type="text" class="file-dialog-filename" id="file-dialog-filename" value="UNTITLED">
+                            </div>
+                            <div class="file-dialog-files">
+                                <div class="file-dialog-drives">
+                                    <div class="file-drive">C:</div>
+                                </div>
+                                <div class="file-dialog-list" id="file-dialog-list">
+                                    <div class="file-item">[..]</div>
+                                    <div class="file-item">WINDOWS</div>
+                                    <div class="file-item">SYSTEM</div>
+                                </div>
+                            </div>
+                            <div class="file-dialog-buttons">
+                                <button class="file-dialog-btn file-dialog-ok" id="file-dialog-ok">OK</button>
+                                <button class="file-dialog-btn file-dialog-cancel" id="file-dialog-cancel">Cancel</button>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Quill AI Application Window (Desktop App - outside Program Manager) -->
