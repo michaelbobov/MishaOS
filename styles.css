@@ -47,6 +47,32 @@ body {
     background-image: url('assets/monitor.png');
     background-size: cover;
     background-position: center;
+    transition: background-image 0.5s ease;
+}
+
+/* Year-specific themes - ready for different monitor images */
+.room-background.year-1985 {
+    background-image: url('assets/monitor.png'); /* Default for now */
+}
+
+.room-background.year-1992 {
+    background-image: url('assets/monitor.png'); /* Default for now */
+}
+
+.room-background.year-1995 {
+    background-image: url('assets/monitor.png'); /* Default for now */
+}
+
+.room-background.year-1998 {
+    background-image: url('assets/monitor.png'); /* Default for now */
+}
+
+.room-background.year-2000 {
+    background-image: url('assets/monitor.png'); /* Default for now */
+}
+
+.room-background.year-2001 {
+    background-image: url('assets/monitor.png'); /* Default for now */
 }
 
 .sticky-note-wrapper {
@@ -527,6 +553,105 @@ body {
     min-width: 160px;
     text-align: center;
     font-size: 11px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.status-bar-date:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+}
+
+.year-selector-dialog {
+    position: absolute;
+    width: 300px;
+    background: var(--win-bg);
+    border: 2px solid;
+    border-color: var(--win-border-light) var(--win-border-darker) var(--win-border-darker) var(--win-border-light);
+    box-shadow: 
+        inset 1px 1px 0 var(--win-border-light),
+        inset -1px -1px 0 var(--win-border-dark);
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+}
+
+.dialog-titlebar {
+    background: var(--win-titlebar);
+    color: white;
+    padding: 4px 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: bold;
+    font-size: 12px;
+    cursor: move;
+}
+
+.dialog-title {
+    flex: 1;
+}
+
+.dialog-close-btn {
+    background: var(--win-bg);
+    border: 1px solid;
+    border-color: var(--win-border-light) var(--win-border-dark) var(--win-border-dark) var(--win-border-light);
+    width: 18px;
+    height: 18px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--win-text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.dialog-close-btn:active {
+    border-color: var(--win-border-dark) var(--win-border-light) var(--win-border-light) var(--win-border-dark);
+}
+
+.dialog-content {
+    padding: 12px;
+    background: var(--win-white);
+}
+
+.dialog-text {
+    margin-bottom: 12px;
+    font-size: 11px;
+    color: var(--win-text);
+}
+
+.year-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+}
+
+.year-btn {
+    padding: 8px 16px;
+    background: var(--win-bg);
+    border: 2px outset var(--win-bg);
+    font-size: 12px;
+    cursor: pointer;
+    font-family: 'Courier New', Tahoma, sans-serif;
+    color: var(--win-text);
+    min-width: 60px;
+}
+
+.year-btn:hover {
+    background: var(--win-white);
+}
+
+.year-btn:active {
+    border: 2px inset var(--win-bg);
+}
+
+.year-btn.selected {
+    background: var(--win-selected);
+    color: white;
+    border: 2px inset var(--win-selected);
 }
 
 /* Volume Control Dropdown */
@@ -1068,10 +1193,127 @@ body {
     line-height: 1.4;
 }
 
+.ai-confirm-btn {
+    padding: 4px 12px;
+    background: var(--win-bg);
+    border: 2px outset var(--win-bg);
+    font-size: 11px;
+    cursor: pointer;
+    font-family: Tahoma, sans-serif;
+    color: var(--win-text);
+    margin: 4px 4px 4px 0;
+}
+
+.ai-confirm-btn:hover {
+    background: var(--win-white);
+}
+
+.ai-confirm-btn:active {
+    border: 2px inset var(--win-bg);
+}
+
+#write-yes-btn {
+    background: var(--win-selected);
+    color: white;
+}
+
+#write-yes-btn:hover {
+    background: #000080;
+}
+
 .ai-input-area {
     display: flex;
     gap: 4px;
     align-items: center;
+    flex-wrap: wrap;
+}
+
+.ai-attach-area {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.ai-attach-btn {
+    padding: 4px 8px;
+    background: var(--win-bg);
+    border: 2px outset var(--win-bg);
+    font-size: 12px;
+    cursor: pointer;
+    font-family: 'Courier New', Tahoma, sans-serif;
+    color: var(--win-text);
+    min-width: 32px;
+}
+
+.ai-attach-btn:hover {
+    background: var(--win-white);
+}
+
+.ai-attach-btn:active {
+    border: 2px inset var(--win-bg);
+}
+
+.ai-url-input {
+    flex: 1;
+    padding: 4px 6px;
+    border: 1px inset var(--win-bg);
+    background: var(--win-white);
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    color: var(--win-text);
+    min-width: 150px;
+}
+
+.ai-attachments {
+    padding: 4px;
+    background: var(--win-bg);
+    border: 1px inset var(--win-bg);
+    margin-top: 4px;
+    max-height: 100px;
+    overflow-y: auto;
+}
+
+.attachment-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2px 4px;
+    background: var(--win-white);
+    border: 1px solid var(--win-border-dark);
+    margin: 2px 0;
+    font-size: 10px;
+}
+
+.remove-attachment {
+    background: var(--win-bg);
+    border: 1px solid var(--win-border-dark);
+    padding: 1px 4px;
+    cursor: pointer;
+    font-size: 10px;
+    color: var(--win-text);
+}
+
+.remove-attachment:hover {
+    background: var(--win-selected);
+    color: white;
+}
+
+.attachments-preview {
+    margin-top: 4px;
+    padding: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px dashed var(--win-border-dark);
+}
+
+.attachment-preview {
+    font-size: 10px;
+    margin: 2px 0;
+}
+
+.attachment-preview img {
+    max-width: 200px;
+    border: 1px solid var(--win-border-dark);
+    margin: 4px 0;
 }
 
 .ai-input {
@@ -1099,6 +1341,106 @@ body {
 }
 
 .ai-send-btn:active {
+    border: 2px inset var(--win-bg);
+}
+
+.ai-features-bar {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--win-bg);
+    border: 1px inset var(--win-bg);
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.ai-feature-btn {
+    padding: 4px 8px;
+    background: var(--win-bg);
+    border: 2px outset var(--win-bg);
+    font-size: 10px;
+    cursor: pointer;
+    font-family: 'Courier New', Tahoma, sans-serif;
+    color: var(--win-text);
+    flex: 1;
+    min-width: 60px;
+    white-space: nowrap;
+}
+
+.ai-feature-btn:hover {
+    background: var(--win-white);
+}
+
+.ai-feature-btn:active {
+    border: 2px inset var(--win-bg);
+}
+
+.ai-feature-btn.active {
+    background: var(--win-selected);
+    color: white;
+    border: 2px inset var(--win-selected);
+}
+
+.ai-message img {
+    max-width: 100%;
+    border: 1px solid var(--win-border-dark);
+    margin: 4px 0;
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+    image-rendering: auto;
+    /* Force pixelated look for retro images */
+    image-rendering: pixelated;
+    /* Scale down for more pixelated effect */
+    image-rendering: -webkit-optimize-contrast;
+}
+
+.generated-image {
+    cursor: pointer;
+}
+
+.image-context-menu {
+    position: absolute;
+    background: var(--win-bg);
+    border: 2px solid;
+    border-color: var(--win-border-light) var(--win-border-darker) var(--win-border-darker) var(--win-border-light);
+    box-shadow: 
+        inset 1px 1px 0 var(--win-border-light),
+        inset -1px -1px 0 var(--win-border-dark);
+    z-index: 10000;
+    min-width: 150px;
+    padding: 2px;
+}
+
+.context-menu-item {
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--win-text);
+    background: var(--win-bg);
+}
+
+.context-menu-item:hover {
+    background: var(--win-selected);
+    color: white;
+}
+
+.copy-btn {
+    padding: 3px 8px;
+    background: var(--win-bg);
+    border: 2px outset var(--win-bg);
+    font-size: 10px;
+    cursor: pointer;
+    font-family: 'Courier New', Tahoma, sans-serif;
+    color: var(--win-text);
+    margin-top: 4px;
+}
+
+.copy-btn:hover {
+    background: var(--win-white);
+}
+
+.copy-btn:active {
     border: 2px inset var(--win-bg);
 }
 

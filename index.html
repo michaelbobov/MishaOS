@@ -44,16 +44,16 @@
                     <div class="desktop-status-bar">
                         <div class="status-bar-left">
                             <div class="status-bar-item" id="volume-control" title="Volume">
-                                <span class="status-icon">🔊</span>
-                                <span class="status-value" id="volume-value">100%</span>
+                                <span class="status-icon">🔉</span>
+                                <span class="status-value" id="volume-value">50%</span>
                             </div>
-                            <div class="status-bar-item" id="network-status" title="Network">
-                                <span class="status-icon">📡</span>
-                                <span class="status-value">Online</span>
+                            <div class="status-bar-item" id="network-status" title="Quill AI">
+                                <img src="assets/quill.png" alt="Quill AI" class="status-icon" style="width: 16px; height: 16px; object-fit: contain;">
+                                <span class="status-value">Quill AI</span>
                             </div>
-                            <div class="status-bar-item" id="cpu-status" title="System">
-                                <span class="status-icon">💻</span>
-                                <span class="status-value">Ready</span>
+                            <div class="status-bar-item" id="fullscreen-btn" title="Fullscreen">
+                                <span class="status-icon">⛶</span>
+                                <span class="status-value">Fullscreen</span>
                             </div>
                         </div>
                         <div class="status-bar-right">
@@ -100,6 +100,12 @@
                             <span class="menu-item"><u>H</u>elp</span>
                         </div>
                         <div class="program-manager-content">
+                            <!-- Read Me icon directly in Program Manager -->
+                            <div class="program-icon" data-app="readme" style="position: absolute; top: 8px; left: 8px;">
+                                <div class="app-icon readme-icon"></div>
+                                <div class="program-icon-label">Read Me</div>
+                            </div>
+                            
                             <!-- Program Groups shown as icons at bottom -->
                             <div class="program-groups-bar">
                                 <div class="group-icon" data-group="accessories">
@@ -147,6 +153,10 @@
                                     </div>
                                 </div>
                                 <div class="program-group-content">
+                                    <div class="program-icon" data-app="readme">
+                                        <div class="app-icon readme-icon"></div>
+                                        <div class="program-icon-label">Read Me</div>
+                                    </div>
                                     <div class="program-icon" data-app="file-manager">
                                         <div class="app-icon file-manager-icon"></div>
                                         <div class="program-icon-label">File<br>Manager</div>
@@ -174,10 +184,6 @@
                                     <div class="program-icon" data-app="pif-editor">
                                         <div class="app-icon pif-icon"></div>
                                         <div class="program-icon-label">PIF Editor</div>
-                                    </div>
-                                    <div class="program-icon" data-app="readme">
-                                        <div class="app-icon readme-icon"></div>
-                                        <div class="program-icon-label">Read Me</div>
                                     </div>
                                 </div>
                             </div>
@@ -556,15 +562,27 @@
                                     </div>
                                     <div class="ai-title">Quill AI</div>
                                 </div>
+                                <div class="ai-features-bar">
+                                    <button class="ai-feature-btn" data-feature="chat" title="Chat">💬 Chat</button>
+                                    <button class="ai-feature-btn" data-feature="image" title="Generate Image">🖼️ Image</button>
+                                    <button class="ai-feature-btn" data-feature="web" title="Web Search">🔍 Web</button>
+                                    <button class="ai-feature-btn" data-feature="code" title="Code Assistant">💻 Code</button>
+                                </div>
                                 <div class="ai-chat-area" id="ai-chat-area">
                                     <div class="ai-message ai-system">
-                                        <div class="message-text">Welcome! I'm Quill AI, your retro AI assistant. Ask me anything or search the web.</div>
+                                        <div class="message-text">Welcome! I'm Quill AI, your retro AI assistant. Select a mode above or ask me anything.</div>
                                     </div>
                                 </div>
                                 <div class="ai-input-area">
-                                    <input type="text" class="ai-input" id="ai-input" placeholder="Type your question or search query..." />
+                                    <div class="ai-attach-area">
+                                        <input type="file" id="ai-file-input" accept="image/*,.txt,.pdf,.doc,.docx" style="display: none;" multiple>
+                                        <input type="text" class="ai-url-input" id="ai-url-input" placeholder="Paste image/document URL..." style="display: none;" />
+                                        <button class="ai-attach-btn" id="ai-attach-btn" title="Attach file or URL">📎</button>
+                                    </div>
+                                    <input type="text" class="ai-input" id="ai-input" placeholder="Type your message..." />
                                     <button class="ai-send-btn" id="ai-send-btn">Send</button>
                                 </div>
+                                <div class="ai-attachments" id="ai-attachments" style="display: none;"></div>
                             </div>
                         </div>
                     </div>

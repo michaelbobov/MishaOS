@@ -6,6 +6,11 @@ class ProgramManager {
         this.mdiOffset = 0; // For cascading MDI child windows
         this.currentWindow = null;
         this.minimizedWindows = new Map();
+        this.masterVolume = 0.5; // Master volume (0.0 to 1.0) - default 50%
+        this.isMuted = false;
+        this.audioElements = []; // Track all audio elements
+        this.openaiApiKey = 'YOUR_OPENAI_API_KEY_HERE'; // Replace with your OpenAI API key
+        this.selectedYear = parseInt(localStorage.getItem('selectedYear') || '1992'); // Default to 1992
         this.init();
     }
 
@@ -578,6 +583,9 @@ class ProgramManager {
         this.setupDesktopClickDeselect();
         this.setupVhsHotspot();
         this.setupDesktopClock();
+        this.setupStickyNoteSound();
+        this.setupYearSelector();
+        this.applyYearTheme(this.selectedYear);
         this.updateStatusBar();
         setInterval(() => this.updateStatusBar(), 1000);
         
@@ -585,6 +593,20 @@ class ProgramManager {
         setTimeout(() => {
             this.loadStartupPrograms();
         }, 500);
+    }
+
+    // Update master volume for all audio elements
+    updateMasterVolume(volumePercent, muted = false) {
+        this.masterVolume = volumePercent / 100;
+        this.isMuted = muted;
+        
+        // Update all tracked audio elements
+        this.audioElements.forEach(audioInfo => {
+            if (audioInfo.audio) {
+                const baseVolume = audioInfo.baseVolume || 1.0;
+                audioInfo.audio.volume = muted ? 0 : (baseVolume * this.masterVolume);
+            }
+        });
     }
 
     setupDesktopClock() {
@@ -623,6 +645,51 @@ class ProgramManager {
         setInterval(updateClock, 1000);
     }
 
+    setupStickyNoteSound() {
+        const stickyNoteWrapper = document.querySelector('.sticky-note-wrapper');
+        if (!stickyNoteWrapper) return;
+
+        const pageTurnSound = new Audio('sounds/Book Page Turn Flip Sound Effect.mp3');
+        const baseVolume = 0.6;
+        pageTurnSound.preload = 'auto';
+        pageTurnSound.load();
+        
+        // Register with volume system
+        this.audioElements.push({
+            audio: pageTurnSound,
+            baseVolume: baseVolume
+        });
+        // Apply current master volume
+        pageTurnSound.volume = this.isMuted ? 0 : (baseVolume * this.masterVolume);
+        
+        let soundDuration = 0;
+        let isPlaying = false;
+
+        pageTurnSound.addEventListener('loadedmetadata', () => {
+            soundDuration = pageTurnSound.duration;
+        });
+
+        stickyNoteWrapper.addEventListener('mouseenter', () => {
+            if (isPlaying || soundDuration === 0) return;
+            
+            const middleStart = Math.max(0, (soundDuration / 2) - 0.1);
+            const playDuration = 0.2;
+            
+            pageTurnSound.currentTime = middleStart;
+            isPlaying = true;
+            
+            pageTurnSound.play().then(() => {
+                setTimeout(() => {
+                    pageTurnSound.pause();
+                    pageTurnSound.currentTime = 0;
+                    isPlaying = false;
+                }, playDuration * 1000);
+            }).catch(() => {
+                isPlaying = false;
+            });
+        });
+    }
+
     setupVhsHotspot() {
         const hotspot = document.getElementById('vhs-hotspot');
         if (!hotspot) return;
@@ -637,8 +704,16 @@ class ProgramManager {
 
         // Load the VHS insertion sound effect
         this.vhsPlayer.insertSound = new Audio('sounds/VHS Tape Going Into VHS Player sound effect.mp3');
-        this.vhsPlayer.insertSound.volume = 0.4;
+        const insertSoundBaseVolume = 0.4;
         this.vhsPlayer.insertSound.preload = 'auto';
+        
+        // Register with volume system
+        this.audioElements.push({
+            audio: this.vhsPlayer.insertSound,
+            baseVolume: insertSoundBaseVolume
+        });
+        // Apply current master volume
+        this.vhsPlayer.insertSound.volume = this.isMuted ? 0 : (insertSoundBaseVolume * this.masterVolume);
 
         // Set up the playlist with the songs
         this.setVhsPlaylist([
@@ -747,10 +822,12 @@ class ProgramManager {
             const fadeOutInterval = fadeOutDuration / fadeOutSteps;
             let currentStep = 0;
             const startVolume = audio.volume;
+            const targetMasterVolume = this.isMuted ? 0 : (1.0 * this.masterVolume);
 
             const fadeOutIntervalId = setInterval(() => {
                 currentStep++;
                 const targetVolume = startVolume * (1 - currentStep / fadeOutSteps);
+                // Fade to zero, not to master volume (since we're stopping)
                 audio.volume = Math.max(targetVolume, 0);
                 
                 if (currentStep >= fadeOutSteps) {
@@ -782,6 +859,11 @@ class ProgramManager {
 
         // Stop any current audio
         if (this.vhsPlayer.audio) {
+            // Remove old audio from tracking
+            const oldIndex = this.audioElements.findIndex(el => el.audio === this.vhsPlayer.audio);
+            if (oldIndex !== -1) {
+                this.audioElements.splice(oldIndex, 1);
+            }
             this.vhsPlayer.audio.pause();
             this.vhsPlayer.audio.currentTime = 0;
         }
@@ -798,8 +880,18 @@ class ProgramManager {
         const src = playlist[idx];
         const audio = new Audio(src);
         this.vhsPlayer.audio = audio;
+        
+        // Register with volume system (remove old one if exists)
+        const existingIndex = this.audioElements.findIndex(el => el.audio === audio);
+        if (existingIndex === -1) {
+            this.audioElements.push({
+                audio: audio,
+                baseVolume: 1.0
+            });
+        }
 
         // Fade in functionality
+        const targetMasterVolume = this.isMuted ? 0 : (1.0 * this.masterVolume);
         audio.volume = 0;
         const fadeInDuration = 2000; // 2 seconds fade in
         const fadeInSteps = 50;
@@ -820,12 +912,12 @@ class ProgramManager {
             // Start fade in
             const fadeInIntervalId = setInterval(() => {
                 currentStep++;
-                const targetVolume = currentStep / fadeInSteps;
-                audio.volume = Math.min(targetVolume, 1);
+                const currentTargetVolume = (currentStep / fadeInSteps) * targetMasterVolume;
+                audio.volume = Math.min(currentTargetVolume, targetMasterVolume);
                 
                 if (currentStep >= fadeInSteps) {
                     clearInterval(fadeInIntervalId);
-                    audio.volume = 1; // Ensure it's at full volume
+                    audio.volume = targetMasterVolume; // Ensure it's at master volume
                 }
             }, fadeInInterval);
         }).catch(err => {
@@ -870,7 +962,7 @@ class ProgramManager {
         // Volume control
         const volumeControl = document.getElementById('volume-control');
         const volumeValue = document.getElementById('volume-value');
-        let volume = 100;
+        let volume = 50; // Default 50%
         let isMuted = false;
 
         // Create volume dropdown
@@ -879,8 +971,8 @@ class ProgramManager {
         volumeDropdown.id = 'volume-dropdown';
         volumeDropdown.innerHTML = `
             <div class="volume-slider-container">
-                <div class="volume-slider-label">Volume: <span id="volume-display">100%</span></div>
-                <input type="range" class="volume-slider" id="volume-slider" min="0" max="100" value="100" />
+                <div class="volume-slider-label">Volume: <span id="volume-display">50%</span></div>
+                <input type="range" class="volume-slider" id="volume-slider" min="0" max="100" value="50" />
                 <button class="volume-mute-btn" id="volume-mute-btn">Mute</button>
             </div>
         `;
@@ -889,6 +981,13 @@ class ProgramManager {
         const volumeSlider = document.getElementById('volume-slider');
         const volumeDisplay = document.getElementById('volume-display');
         const muteBtn = document.getElementById('volume-mute-btn');
+        
+        // Initialize volume display and icon
+        volumeValue.textContent = '50%';
+        volumeControl.querySelector('.status-icon').textContent = '🔉';
+        
+        // Initialize master volume to 50%
+        this.updateMasterVolume(50, false);
 
         volumeControl.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -912,6 +1011,8 @@ class ProgramManager {
                 volumeValue.textContent = volume + '%';
                 volumeDisplay.textContent = volume + '%';
                 volumeControl.querySelector('.status-icon').textContent = volume === 0 ? '🔇' : volume < 50 ? '🔉' : '🔊';
+                // Update all audio volumes
+                this.updateMasterVolume(volume, false);
             }
         });
 
@@ -922,11 +1023,15 @@ class ProgramManager {
                 volumeDisplay.textContent = 'Muted';
                 volumeControl.querySelector('.status-icon').textContent = '🔇';
                 muteBtn.textContent = 'Unmute';
+                // Mute all audio
+                this.updateMasterVolume(volume, true);
             } else {
                 volumeValue.textContent = volume + '%';
                 volumeDisplay.textContent = volume + '%';
                 volumeControl.querySelector('.status-icon').textContent = volume === 0 ? '🔇' : volume < 50 ? '🔉' : '🔊';
                 muteBtn.textContent = 'Mute';
+                // Unmute all audio
+                this.updateMasterVolume(volume, false);
             }
         });
 
@@ -936,6 +1041,106 @@ class ProgramManager {
                 volumeDropdown.style.display = 'none';
             }
         });
+
+        // Quill AI click handler
+        const quillAiStatus = document.getElementById('network-status');
+        if (quillAiStatus) {
+            quillAiStatus.style.cursor = 'pointer';
+            quillAiStatus.addEventListener('click', () => {
+                this.openAIAssistant();
+            });
+        }
+
+        // Fullscreen button
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
+        if (fullscreenBtn) {
+            fullscreenBtn.style.cursor = 'pointer';
+            let isFullscreen = false;
+            
+            fullscreenBtn.addEventListener('click', () => {
+                isFullscreen = !isFullscreen;
+                
+                if (isFullscreen) {
+                    // Enter fullscreen - hide background, make viewport fullscreen
+                    const roomBg = document.querySelector('.room-background');
+                    const crtMonitor = document.querySelector('.crt-monitor');
+                    const monitorScreen = document.querySelector('.monitor-screen');
+                    const screenContent = document.querySelector('.screen-content');
+                    
+                    roomBg.style.display = 'none';
+                    crtMonitor.style.position = 'fixed';
+                    crtMonitor.style.inset = '0';
+                    crtMonitor.style.width = '100vw';
+                    crtMonitor.style.height = '100vh';
+                    crtMonitor.style.background = '#000';
+                    monitorScreen.style.position = 'fixed';
+                    monitorScreen.style.inset = '0';
+                    monitorScreen.style.width = '100vw';
+                    monitorScreen.style.height = '100vh';
+                    monitorScreen.style.top = '0';
+                    monitorScreen.style.left = '0';
+                    monitorScreen.style.transform = 'none';
+                    monitorScreen.style.clipPath = 'none';
+                    monitorScreen.style.background = 'transparent';
+                    screenContent.style.width = '100vw';
+                    screenContent.style.height = '100vh';
+                    screenContent.style.position = 'fixed';
+                    screenContent.style.inset = '0';
+                    screenContent.style.clipPath = 'none';
+                    screenContent.style.background = 'var(--win-bg)';
+                    
+                    fullscreenBtn.querySelector('.status-icon').textContent = '⛶';
+                    fullscreenBtn.querySelector('.status-value').textContent = 'Exit';
+                    fullscreenBtn.title = 'Exit Fullscreen';
+                    
+                    // Request fullscreen API if available
+                    if (document.documentElement.requestFullscreen) {
+                        document.documentElement.requestFullscreen().catch(err => {
+                            console.log('Fullscreen error:', err);
+                        });
+                    }
+                } else {
+                    // Exit fullscreen - restore background and original styles
+                    const roomBg = document.querySelector('.room-background');
+                    const crtMonitor = document.querySelector('.crt-monitor');
+                    const monitorScreen = document.querySelector('.monitor-screen');
+                    const screenContent = document.querySelector('.screen-content');
+                    
+                    roomBg.style.display = '';
+                    crtMonitor.style.position = '';
+                    crtMonitor.style.inset = '';
+                    crtMonitor.style.width = '';
+                    crtMonitor.style.height = '';
+                    crtMonitor.style.background = '';
+                    monitorScreen.style.position = '';
+                    monitorScreen.style.inset = '';
+                    monitorScreen.style.width = '';
+                    monitorScreen.style.height = '';
+                    monitorScreen.style.top = '';
+                    monitorScreen.style.left = '';
+                    monitorScreen.style.transform = '';
+                    monitorScreen.style.clipPath = '';
+                    monitorScreen.style.background = '';
+                    screenContent.style.width = '';
+                    screenContent.style.height = '';
+                    screenContent.style.position = '';
+                    screenContent.style.inset = '';
+                    screenContent.style.clipPath = '';
+                    screenContent.style.background = '';
+                    
+                    fullscreenBtn.querySelector('.status-icon').textContent = '⛶';
+                    fullscreenBtn.querySelector('.status-value').textContent = 'Fullscreen';
+                    fullscreenBtn.title = 'Fullscreen';
+                    
+                    // Exit fullscreen API if available
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen().catch(err => {
+                            console.log('Exit fullscreen error:', err);
+                        });
+                    }
+                }
+            });
+        }
     }
 
     setupDesktopIcons() {
@@ -1084,41 +1289,213 @@ class ProgramManager {
         const input = document.getElementById('ai-input');
         const sendBtn = document.getElementById('ai-send-btn');
         const chatArea = document.getElementById('ai-chat-area');
+        const attachBtn = document.getElementById('ai-attach-btn');
+        const fileInput = document.getElementById('ai-file-input');
+        const urlInput = document.getElementById('ai-url-input');
+        const attachmentsArea = document.getElementById('ai-attachments');
+        let currentMode = 'chat'; // Default mode
+        let attachedFiles = [];
+        let attachedUrls = [];
 
-        const sendMessage = () => {
+        // Feature button handlers
+        const featureButtons = document.querySelectorAll('.ai-feature-btn');
+        featureButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Remove active class from all buttons
+                featureButtons.forEach(b => b.classList.remove('active'));
+                // Add active class to clicked button
+                btn.classList.add('active');
+                currentMode = btn.dataset.feature;
+                
+                // Update placeholder based on mode
+                const placeholders = {
+                    'chat': 'Type your message...',
+                    'image': 'Describe the image you want to generate...',
+                    'web': 'Enter your search query...',
+                    'code': 'Ask a coding question or request code...'
+                };
+                input.placeholder = placeholders[currentMode] || 'Type your message...';
+            });
+        });
+
+        // Set default active button
+        document.querySelector('.ai-feature-btn[data-feature="chat"]').classList.add('active');
+
+        // Attachment button handler
+        let attachMode = 'file'; // 'file' or 'url'
+        attachBtn.addEventListener('click', () => {
+            if (attachMode === 'file') {
+                fileInput.click();
+            } else {
+                urlInput.style.display = urlInput.style.display === 'none' ? 'block' : 'none';
+                if (urlInput.style.display === 'block') {
+                    urlInput.focus();
+                }
+            }
+        });
+
+        // Toggle between file and URL mode (right-click or long press)
+        attachBtn.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            attachMode = attachMode === 'file' ? 'url' : 'file';
+            attachBtn.title = attachMode === 'file' ? 'Attach file' : 'Attach URL';
+        });
+
+        // File input handler
+        fileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            files.forEach(file => {
+                attachedFiles.push(file);
+                this.displayAttachment(file, attachmentsArea, 'file', attachedFiles.length - 1, 0);
+            });
+            fileInput.value = ''; // Reset input
+        });
+
+        // URL input handler
+        urlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const url = urlInput.value.trim();
+                if (url && this.isValidUrl(url)) {
+                    attachedUrls.push(url);
+                    this.displayAttachment(url, attachmentsArea, 'url', 0, attachedUrls.length - 1);
+                    urlInput.value = '';
+                    urlInput.style.display = 'none';
+                }
+            }
+        });
+
+        // Remove attachment handler
+        attachmentsArea.addEventListener('click', (e) => {
+            if (e.target.classList.contains('remove-attachment')) {
+                const attachmentItem = e.target.closest('.attachment-item');
+                const index = parseInt(attachmentItem.dataset.index);
+                const type = attachmentItem.dataset.type;
+                
+                if (type === 'file') {
+                    attachedFiles.splice(index, 1);
+                } else {
+                    attachedUrls.splice(index, 1);
+                }
+                attachmentItem.remove();
+                this.updateAttachmentsDisplay();
+            }
+        });
+
+        const sendMessage = async () => {
             const query = input.value.trim();
-            if (!query) return;
+            const hasAttachments = attachedFiles.length > 0 || attachedUrls.length > 0;
+            
+            if (!query && !hasAttachments) return;
 
-            // Add user message
+            // Add user message with mode indicator and attachments
             const userMsg = document.createElement('div');
             userMsg.className = 'ai-message ai-user';
-            userMsg.innerHTML = `<div class="message-text">${query}</div>`;
+            const modeLabel = currentMode.charAt(0).toUpperCase() + currentMode.slice(1);
+            let messageHtml = `<div class="message-text"><strong>[${modeLabel}]</strong> ${query || '(no text)'}</div>`;
+            
+            // Add attachments preview
+            if (attachedFiles.length > 0 || attachedUrls.length > 0) {
+                messageHtml += '<div class="attachments-preview">';
+                attachedFiles.forEach((file, idx) => {
+                    if (file.type.startsWith('image/')) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            const img = userMsg.querySelector(`.attachment-preview[data-file-index="${idx}"]`);
+                            if (img) img.innerHTML = `<img src="${e.target.result}" style="max-width: 200px; border: 1px solid #808080;">`;
+                        };
+                        reader.readAsDataURL(file);
+                        messageHtml += `<div class="attachment-preview" data-file-index="${idx}">📷 ${file.name} (loading...)</div>`;
+                    } else {
+                        messageHtml += `<div class="attachment-preview">📄 ${file.name} (${(file.size / 1024).toFixed(1)}KB)</div>`;
+                    }
+                });
+                attachedUrls.forEach((url, idx) => {
+                    messageHtml += `<div class="attachment-preview">🔗 <a href="${url}" target="_blank">${url}</a></div>`;
+                });
+                messageHtml += '</div>';
+            }
+            
+            userMsg.innerHTML = messageHtml;
             chatArea.appendChild(userMsg);
 
-            // Clear input
+            // Store attachments for API call
+            const filesToSend = [...attachedFiles];
+            const urlsToSend = [...attachedUrls];
+
+            // Clear input and attachments
             input.value = '';
+            attachedFiles = [];
+            attachedUrls = [];
+            this.clearAttachments(attachmentsArea);
 
             // Scroll to bottom
             chatArea.scrollTop = chatArea.scrollHeight;
 
-            // Simulate AI response (retro style)
-            setTimeout(() => {
-                const aiMsg = document.createElement('div');
-                aiMsg.className = 'ai-message ai-assistant';
-                const responses = [
-                    "That's an interesting question! In the retro computing era, we would have consulted manuals and documentation.",
-                    "Processing your request... Please wait while I search through my knowledge base.",
-                    "I'm a retro AI assistant from the classic computing era. My capabilities are limited compared to modern AI, but I'll do my best!",
-                    "Let me check my database... Hmm, that's a complex query. Would you like me to search for more information?",
-                    "In the classic computing days, we relied on command-line interfaces and text-based systems. Your question reminds me of those times!",
-                    "I'm processing your request using vintage algorithms. This might take a moment...",
-                    "That's a great question! Unfortunately, as a retro AI, I don't have access to real-time web search, but I can help with general knowledge.",
-                ];
-                const response = responses[Math.floor(Math.random() * responses.length)];
-                aiMsg.innerHTML = `<div class="message-text">${response}</div>`;
-                chatArea.appendChild(aiMsg);
-                chatArea.scrollTop = chatArea.scrollHeight;
-            }, 500);
+            // Show loading message
+            const loadingMsg = document.createElement('div');
+            loadingMsg.className = 'ai-message ai-assistant';
+            loadingMsg.innerHTML = '<div class="message-text">Processing...</div>';
+            chatArea.appendChild(loadingMsg);
+            chatArea.scrollTop = chatArea.scrollHeight;
+
+            // Handle different modes with real API calls
+            if (currentMode === 'image') {
+                // Image generation with DALL-E (pass attachments for reference images)
+                this.generateImage(query, loadingMsg, chatArea, filesToSend, urlsToSend);
+            } else if (currentMode === 'web') {
+                // Web search using chat API
+                this.webSearch(query, loadingMsg, chatArea);
+            } else if (currentMode === 'code') {
+                // Code assistant
+                this.codeAssistant(query, loadingMsg, chatArea);
+            } else {
+                // Regular chat with attachments
+                // Check if this is a writing request
+                const isWritingRequest = this.detectWritingRequest(query);
+                
+                if (isWritingRequest) {
+                    // First, ask in chat if they want to use Write app
+                    loadingMsg.innerHTML = `
+                        <div class="message-text">
+                            <strong>Would you like me to write this in the Write application?</strong><br>
+                            <button class="ai-confirm-btn" id="write-yes-btn" style="margin: 4px 4px 4px 0; padding: 4px 12px; background: var(--win-selected); color: white; border: 1px outset var(--win-bg); cursor: pointer;">Yes</button>
+                            <button class="ai-confirm-btn" id="write-no-btn" style="margin: 4px; padding: 4px 12px; background: var(--win-bg); color: var(--win-text); border: 1px outset var(--win-bg); cursor: pointer;">No</button>
+                        </div>
+                    `;
+                    
+                    // Set up button handlers
+                    const yesBtn = document.getElementById('write-yes-btn');
+                    const noBtn = document.getElementById('write-no-btn');
+                    
+                    yesBtn.addEventListener('click', async () => {
+                        // Position windows side by side with equal space
+                        this.positionWindowsForWrite();
+                        
+                        loadingMsg.innerHTML = '<div class="message-text">Writing in Write application...</div>';
+                        
+                        // First, get the written content only (for Write app)
+                        const writeContent = await this.getWriteContent(query, filesToSend, urlsToSend);
+                        
+                        // Then, get the full conversational response (for chat)
+                        const chatResult = await this.chatResponse(query, loadingMsg, chatArea, filesToSend, urlsToSend, false);
+                        
+                        if (writeContent) {
+                            // Write to Write app
+                            await this.writeToWriteApp(writeContent, query);
+                        }
+                        
+                        chatArea.scrollTop = chatArea.scrollHeight;
+                    });
+                    
+                    noBtn.addEventListener('click', async () => {
+                        // Normal chat flow
+                        await this.chatResponse(query, loadingMsg, chatArea, filesToSend, urlsToSend);
+                    });
+                } else {
+                    // Normal chat flow
+                    await this.chatResponse(query, loadingMsg, chatArea, filesToSend, urlsToSend);
+                }
+            }
         };
 
         sendBtn.addEventListener('click', sendMessage);
@@ -1127,6 +1504,831 @@ class ProgramManager {
                 sendMessage();
             }
         });
+    }
+
+    async generateImage(prompt, loadingMsg, chatArea, files = [], urls = []) {
+        try {
+            let finalPrompt = prompt;
+            
+            // If there are reference images, analyze them first
+            const imageFiles = files.filter(f => f.type.startsWith('image/'));
+            const imageUrls = urls.filter(u => this.isImageUrl(u));
+            
+            let hasReference = false;
+            let referenceDescription = '';
+            
+            if (imageFiles.length > 0 || imageUrls.length > 0) {
+                // Analyze reference images using vision API
+                const imageAnalyses = [];
+                
+                for (const file of imageFiles) {
+                    const base64 = await this.fileToBase64(file);
+                    const analysis = await this.analyzeImageWithVision(`data:${file.type};base64,${base64}`, prompt);
+                    if (analysis) {
+                        imageAnalyses.push(analysis);
+                    }
+                }
+                
+                for (const url of imageUrls) {
+                    const analysis = await this.analyzeImageWithVision(url, prompt);
+                    if (analysis) {
+                        imageAnalyses.push(analysis);
+                    }
+                }
+                
+                // Combine analyses with the user's prompt
+                if (imageAnalyses.length > 0) {
+                    hasReference = true;
+                    referenceDescription = imageAnalyses.join('\n\n');
+                }
+            }
+            
+            // Build the final prompt with better structure
+            let enhancedPrompt;
+            
+            if (hasReference) {
+                // When there's a reference, structure the prompt to emphasize accuracy
+                enhancedPrompt = `Create a retro pixelated image in 1992 video game style. 
+
+REFERENCE IMAGE DETAILS (MUST MATCH ACCURATELY):
+${referenceDescription}
+
+USER REQUEST: ${prompt}
+
+IMPORTANT INSTRUCTIONS:
+- Accurately recreate the subjects, composition, colors, and style from the reference image
+- Apply the user's request while maintaining the reference image's core elements
+- Style: 1992 video game graphics, 8-bit pixel art, low resolution 256x256 or 320x200, chunky blocky pixels, classic DOS game aesthetic, limited 16-color palette, dithering patterns, scanlines effect, CRT monitor look, pixelated texture, retro gaming style, early 1990s computer graphics
+- Match the reference image's composition, colors, and subjects as closely as possible while incorporating the user's modifications`;
+            } else {
+                // Standard generation without reference
+                enhancedPrompt = `Create a retro pixelated image: ${prompt}. Style: 1992 video game graphics, 8-bit pixel art, low resolution 256x256 or 320x200, chunky blocky pixels, classic DOS game aesthetic, limited 16-color palette, dithering patterns, scanlines effect, CRT monitor look, pixelated texture, retro gaming style, early 1990s computer graphics`;
+            }
+            
+            const response = await fetch('https://api.openai.com/v1/images/generations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.openaiApiKey}`
+                },
+                body: JSON.stringify({
+                    model: 'dall-e-3',
+                    prompt: enhancedPrompt,
+                    n: 1,
+                    size: '1024x1024',
+                    quality: 'standard',
+                    style: 'vivid'
+                })
+            });
+
+            const data = await response.json();
+            loadingMsg.remove();
+
+            const aiMsg = document.createElement('div');
+            aiMsg.className = 'ai-message ai-assistant';
+            
+            if (data.error) {
+                aiMsg.innerHTML = `<div class="message-text"><strong>Error:</strong> ${data.error.message}</div>`;
+            } else if (data.data && data.data[0]) {
+                const imageUrl = data.data[0].url;
+                const imageId = 'img-' + Date.now();
+                aiMsg.innerHTML = `
+                    <div class="message-text">
+                        <strong>Image Generated:</strong><br>
+                        <div style="position: relative; display: inline-block; width: 100%;">
+                            <img id="${imageId}" src="${imageUrl}" alt="Generated image" class="generated-image" style="max-width: 100%; border: 1px solid #808080; margin: 4px 0; image-rendering: pixelated; image-rendering: -moz-crisp-edges; image-rendering: crisp-edges; cursor: pointer;">
+                            <button class="copy-btn" data-copy-type="image" data-copy-value="${imageUrl}" style="margin-top: 4px;">📋 Copy Image URL</button>
+                        </div>
+                    </div>
+                `;
+                // Add copy functionality
+                const copyBtn = aiMsg.querySelector('.copy-btn');
+                copyBtn.addEventListener('click', () => this.copyToClipboard(imageUrl, copyBtn));
+                
+                // Add context menu for saving image
+                const img = aiMsg.querySelector(`#${imageId}`);
+                this.setupImageContextMenu(img, imageUrl);
+            } else {
+                aiMsg.innerHTML = `<div class="message-text"><strong>Error:</strong> No image generated</div>`;
+            }
+
+            chatArea.appendChild(aiMsg);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        } catch (error) {
+            loadingMsg.remove();
+            const aiMsg = document.createElement('div');
+            aiMsg.className = 'ai-message ai-assistant';
+            aiMsg.innerHTML = `<div class="message-text"><strong>Error:</strong> ${error.message}</div>`;
+            chatArea.appendChild(aiMsg);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+    }
+
+    async webSearch(query, loadingMsg, chatArea) {
+        try {
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.openaiApiKey}`
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4',
+                    messages: [
+                        {
+                            role: 'system',
+                            content: 'You are a 1992-era assistant providing search results. Your knowledge cutoff is December 1992. Only provide information, websites, and resources that existed in 1992 or earlier. Format your response as search results with titles and brief descriptions, referencing early web, BBS systems, and 1992-era information sources.'
+                        },
+                        {
+                            role: 'user',
+                            content: `Search for information about: ${query}. Provide 3-5 relevant results from 1992 or earlier with titles and brief descriptions.`
+                        }
+                    ],
+                    max_tokens: 500
+                })
+            });
+
+            const data = await response.json();
+            loadingMsg.remove();
+
+            const aiMsg = document.createElement('div');
+            aiMsg.className = 'ai-message ai-assistant';
+            
+            if (data.error) {
+                aiMsg.innerHTML = `<div class="message-text"><strong>Error:</strong> ${data.error.message}</div>`;
+            } else if (data.choices && data.choices[0]) {
+                const content = data.choices[0].message.content;
+                aiMsg.innerHTML = `
+                    <div class="message-text">
+                        <strong>Web Search Results:</strong><br>
+                        ${content.replace(/\n/g, '<br>')}
+                    </div>
+                `;
+            } else {
+                aiMsg.innerHTML = `<div class="message-text"><strong>Error:</strong> No results</div>`;
+            }
+
+            chatArea.appendChild(aiMsg);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        } catch (error) {
+            loadingMsg.remove();
+            const aiMsg = document.createElement('div');
+            aiMsg.className = 'ai-message ai-assistant';
+            aiMsg.innerHTML = `<div class="message-text"><strong>Error:</strong> ${error.message}</div>`;
+            chatArea.appendChild(aiMsg);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+    }
+
+    async codeAssistant(query, loadingMsg, chatArea) {
+        try {
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.openaiApiKey}`
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4',
+                    messages: [
+                        {
+                            role: 'system',
+                            content: 'You are a 1992-era coding assistant. Provide code examples using programming languages and techniques from 1992 or earlier (C, C++, Pascal, BASIC, Assembly, DOS programming, etc.). Reference 1992-era libraries, APIs, and computing concepts. Format code in code blocks with retro-style comments.'
+                        },
+                        {
+                            role: 'user',
+                            content: query
+                        }
+                    ],
+                    max_tokens: 1000
+                })
+            });
+
+            const data = await response.json();
+            loadingMsg.remove();
+
+            const aiMsg = document.createElement('div');
+            aiMsg.className = 'ai-message ai-assistant';
+            
+            if (data.error) {
+                aiMsg.innerHTML = `<div class="message-text"><strong>Error:</strong> ${data.error.message}</div>`;
+            } else if (data.choices && data.choices[0]) {
+                const content = data.choices[0].message.content;
+                // Format code blocks with retro terminal style and copy buttons
+                const codeBlocks = [];
+                const formattedContent = content.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+                    const codeText = code.trim();
+                    const codeIndex = codeBlocks.length;
+                    codeBlocks.push(codeText);
+                    // Store code in data attribute (base64 encoded to avoid HTML issues)
+                    const encodedCode = btoa(unescape(encodeURIComponent(codeText)));
+                    const blockHtml = `<div style="position: relative;">
+                        <div style="background: #000; color: #0F0; padding: 8px; font-family: 'Courier New', monospace; font-size: 10px; border: 1px solid #808080; margin: 4px 0; white-space: pre-wrap; overflow-x: auto;">${this.escapeHtml(codeText)}</div>
+                        <button class="copy-btn" data-copy-type="code" data-code-encoded="${encodedCode}" style="margin-top: 4px;">📋 Copy Code</button>
+                    </div>`;
+                    return blockHtml;
+                });
+                aiMsg.innerHTML = `
+                    <div class="message-text">
+                        <strong>Code Assistant:</strong><br>
+                        ${formattedContent.replace(/\n/g, '<br>')}
+                    </div>
+                `;
+                // Add copy functionality to all code copy buttons
+                aiMsg.querySelectorAll('.copy-btn[data-copy-type="code"]').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const encodedCode = btn.dataset.codeEncoded;
+                        const codeText = decodeURIComponent(escape(atob(encodedCode)));
+                        this.copyToClipboard(codeText, btn);
+                    });
+                });
+            } else {
+                aiMsg.innerHTML = `<div class="message-text"><strong>Error:</strong> No response</div>`;
+            }
+
+            chatArea.appendChild(aiMsg);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        } catch (error) {
+            loadingMsg.remove();
+            const aiMsg = document.createElement('div');
+            aiMsg.className = 'ai-message ai-assistant';
+            aiMsg.innerHTML = `<div class="message-text"><strong>Error:</strong> ${error.message}</div>`;
+            chatArea.appendChild(aiMsg);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+    }
+
+    displayAttachment(item, container, type, fileIndex, urlIndex) {
+        container.style.display = 'block';
+        const attachmentItem = document.createElement('div');
+        attachmentItem.className = 'attachment-item';
+        const index = type === 'file' ? fileIndex : urlIndex;
+        attachmentItem.dataset.index = index;
+        attachmentItem.dataset.type = type;
+        
+        if (type === 'file') {
+            attachmentItem.innerHTML = `
+                <span>📎 ${item.name}</span>
+                <button class="remove-attachment">✕</button>
+            `;
+        } else {
+            attachmentItem.innerHTML = `
+                <span>🔗 ${item.substring(0, 40)}...</span>
+                <button class="remove-attachment">✕</button>
+            `;
+        }
+        container.appendChild(attachmentItem);
+    }
+
+    clearAttachments(container) {
+        container.innerHTML = '';
+        container.style.display = 'none';
+    }
+
+    updateAttachmentsDisplay() {
+        const attachmentsArea = document.getElementById('ai-attachments');
+        if (attachedFiles.length === 0 && attachedUrls.length === 0) {
+            this.clearAttachments(attachmentsArea);
+        }
+    }
+
+    isValidUrl(string) {
+        try {
+            new URL(string);
+            return true;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    isImageUrl(url) {
+        return /\.(jpg|jpeg|png|gif|webp|bmp)(\?.*)?$/i.test(url) || url.startsWith('data:image/');
+    }
+
+    fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const base64 = reader.result.split(',')[1];
+                resolve(base64);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    fileToText(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsText(file);
+        });
+    }
+
+    async getModelForAttachments(files, urls) {
+        const hasImages = files.some(f => f.type.startsWith('image/')) || 
+                         urls.some(u => this.isImageUrl(u));
+        return hasImages ? 'gpt-4o' : 'gpt-4';
+    }
+
+    async buildMessagesWithAttachments(query, files, urls) {
+        const messages = [
+            {
+                role: 'system',
+                content: `You are Quill AI, a retro AI assistant from 1992. Your knowledge cutoff is December 1992. You only know about events, technology, and information from before or during 1992. You reference DOS, Windows 3.1, early internet (BBS, early web), 8-bit/16-bit gaming, floppy disks, dial-up modems, and other 1992-era computing. When asked about things after 1992, you respond as if you don't know about them yet, or reference them as "future" concepts. Keep responses concise, nostalgic, and in character as a 1992-era AI assistant.
+
+IMPORTANT: You are running in a retro-inspired operating system interface. Here's what users can do:
+
+INSIDE THE OS (Program Manager):
+- Main Group: Read Me (project information), File Manager, Control Panel, Print Manager, Clipboard Viewer, DOS Prompt, Windows Setup, PIF Editor
+- Games Group: Minesweeper, SkiFree, Solitaire, Doom
+- Accessories Group: Write, Paintbrush, Terminal, Notepad, Recorder, Calendar, Calculator, Clock, Object Packager, Character Map, Media Player, Sound Recorder, Cardfile
+- Startup Group: Programs that launch automatically on startup (customizable)
+- Network Group: Network-related programs
+
+OUTSIDE THE OS (Desktop/Background):
+- VHS Player: Click the VHS deck area (bottom-right of monitor) to play retro music tracks. Click again to stop. Features include: Billy Ray Cyrus, En Vogue, Kome Kome Club, SNAP!, Алла Пугачёва, Группа крови, 悲しみは雪のように浜田 省吾
+- Sticky Note: Yellow sticky note at bottom-left of monitor - hover over it to see it bend and hear a page turn sound effect
+- Desktop Clock: Shows current time with analog clock face
+- Volume Control: Status bar at bottom has volume slider (default 50%) - controls all audio (music, sound effects)
+- Quill AI: You are accessible from desktop icon or status bar
+
+FEATURES:
+- All windows are draggable and resizable
+- Windows can be minimized to taskbar
+- MDI (Multiple Document Interface) for program groups
+- Retro Windows 3.1 aesthetic throughout
+- All audio respects master volume control
+- Write Application Integration: When users ask you to write something (documents, paragraphs, letters, etc.), you can offer to write it directly in the Write application for them. The system will detect writing requests and prompt the user if they want to use Write.
+
+When users ask what they can do, tell them about these features and how to access them.`
+            }
+        ];
+
+        // Build user message with attachments
+        const userContent = [];
+        
+        // Add text query if present
+        if (query) {
+            userContent.push({ type: 'text', text: query });
+        }
+
+        // Add image URLs
+        for (const url of urls) {
+            if (this.isImageUrl(url)) {
+                userContent.push({
+                    type: 'image_url',
+                    image_url: { url: url }
+                });
+            } else {
+                // For non-image URLs, add as text reference
+                userContent.push({ type: 'text', text: `Please analyze this URL: ${url}` });
+            }
+        }
+
+        // Process image files
+        for (const file of files) {
+            if (file.type.startsWith('image/')) {
+                const base64 = await this.fileToBase64(file);
+                userContent.push({
+                    type: 'image_url',
+                    image_url: { url: `data:${file.type};base64,${base64}` }
+                });
+            } else {
+                // For text files, read and include content
+                try {
+                    const text = await this.fileToText(file);
+                    userContent.push({ type: 'text', text: `Content from ${file.name}:\n${text}` });
+                } catch (err) {
+                    userContent.push({ type: 'text', text: `File ${file.name} (${(file.size / 1024).toFixed(1)}KB) - unable to read content` });
+                }
+            }
+        }
+
+        // Add user message
+        if (userContent.length === 1 && userContent[0].type === 'text') {
+            messages.push({
+                role: 'user',
+                content: userContent[0].text
+            });
+        } else {
+            messages.push({
+                role: 'user',
+                content: userContent
+            });
+        }
+
+        return messages;
+    }
+
+    detectWritingRequest(query) {
+        const writingKeywords = [
+            'write', 'create a document', 'make a document', 'draft', 
+            'compose', 'type', 'put in writing', 'document about',
+            'paragraph about', 'essay about', 'letter about', 'note about',
+            'write a', 'write an', 'write some', 'write about'
+        ];
+        const lowerQuery = query.toLowerCase();
+        return writingKeywords.some(keyword => lowerQuery.includes(keyword));
+    }
+
+    positionWindowsForWrite() {
+        const screenContent = document.querySelector('.screen-content');
+        const statusBar = document.querySelector('.desktop-status-bar');
+        const screenRect = screenContent.getBoundingClientRect();
+        const statusBarHeight = statusBar ? statusBar.offsetHeight : 0;
+        const offset = 8;
+        const gap = 8; // Gap between windows
+        const availableWidth = screenRect.width - (offset * 2) - gap;
+        const windowWidth = Math.floor(availableWidth / 2); // Equal space for both windows
+        const windowHeight = screenRect.height - statusBarHeight - (offset * 2);
+        
+        // Ensure Quill AI is open and positioned on the left
+        const aiApp = document.getElementById('ai-assistant-app');
+        if (aiApp) {
+            aiApp.style.display = 'flex';
+            aiApp.style.left = `${offset}px`;
+            aiApp.style.top = `${offset}px`;
+            aiApp.style.width = `${windowWidth}px`;
+            aiApp.style.height = `${windowHeight}px`;
+            aiApp.style.position = 'absolute';
+            this.setupWindowDrag(aiApp);
+            this.setupSingleWindowControls(aiApp);
+            this.focusWindow(aiApp);
+        }
+        
+        // Open and position Write app on the right side
+        this.openAccessory('write');
+        
+        setTimeout(() => {
+            const writeWindow = document.getElementById('write-app');
+            if (writeWindow) {
+                writeWindow.style.display = 'flex';
+                writeWindow.style.left = `${offset + windowWidth + gap}px`;
+                writeWindow.style.top = `${offset}px`;
+                writeWindow.style.width = `${windowWidth}px`;
+                writeWindow.style.height = `${windowHeight}px`;
+                writeWindow.style.position = 'absolute';
+                this.setupWindowDrag(writeWindow);
+                this.setupSingleWindowControls(writeWindow);
+            }
+        }, 50);
+    }
+
+    async getWriteContent(query, files = [], urls = []) {
+        // Get ONLY the written content without any questions or explanations
+        try {
+            const model = await this.getModelForAttachments(files, urls);
+            const messages = await this.buildMessagesWithAttachments(query, files, urls);
+            
+            // Modify the system message to ask for ONLY written content
+            if (messages.length > 0 && messages[0].role === 'system') {
+                messages[0].content += '\n\nIMPORTANT: When the user asks you to write something (essay, document, paragraph, letter, etc.), provide ONLY the written content itself. Do NOT include any questions, explanations, introductions, or conversational text. Just provide the actual written content that should go in the document.';
+            }
+            
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.openaiApiKey}`
+                },
+                body: JSON.stringify({
+                    model: model,
+                    messages: messages,
+                    max_tokens: 2000
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.choices && data.choices[0]) {
+                let content = data.choices[0].message.content;
+                
+                // Try to extract just the written content by removing common conversational prefixes
+                // Remove things like "Absolutely! Would you like me to..." or "Here's the essay:" etc.
+                const conversationalPrefixes = [
+                    /^Absolutely!.*?Would you like me to.*?\n\n/gi,
+                    /^Here'?s (the|your|a).*?:\n\n/gi,
+                    /^I'?ll.*?:\n\n/gi,
+                    /^Let me.*?:\n\n/gi,
+                    /^For your.*?,\s*/gi,
+                    /^Remember,.*?\n\n/gi,
+                    /^Is there.*?\?/gi,
+                    /^Absolutely!.*?\n\n/gi
+                ];
+                
+                conversationalPrefixes.forEach(pattern => {
+                    content = content.replace(pattern, '');
+                });
+                
+                // Remove trailing questions or conversational text
+                content = content.replace(/\n\nIs there.*$/gi, '');
+                content = content.replace(/\n\nRemember,.*$/gi, '');
+                
+                return content.trim();
+            }
+            return null;
+        } catch (error) {
+            console.error('Error getting write content:', error);
+            return null;
+        }
+    }
+
+    async writeToWriteApp(content, userQuery) {
+        // Wait for Write window to be ready, then populate it
+        setTimeout(() => {
+            const writeWindow = document.getElementById('write-app');
+            if (writeWindow) {
+                const editor = writeWindow.querySelector('.write-editor');
+                if (editor) {
+                    // Clear existing content
+                    editor.innerHTML = '';
+                    // Add new content (preserving line breaks)
+                    const formattedContent = content.replace(/\n/g, '<br>');
+                    editor.innerHTML = formattedContent;
+                    editor.focus();
+                    // Move cursor to end
+                    const range = document.createRange();
+                    const selection = window.getSelection();
+                    range.selectNodeContents(editor);
+                    range.collapse(false);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    editor.scrollTop = editor.scrollHeight;
+                }
+            }
+        }, 300);
+    }
+
+    async chatResponse(query, loadingMsg, chatArea, files = [], urls = [], skipDisplay = false) {
+        try {
+            const model = await this.getModelForAttachments(files, urls);
+            const messages = await this.buildMessagesWithAttachments(query, files, urls);
+            
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.openaiApiKey}`
+                },
+                body: JSON.stringify({
+                    model: model,
+                    messages: messages,
+                    max_tokens: 1000
+                })
+            });
+
+            const data = await response.json();
+            loadingMsg.remove();
+
+            let content = null;
+            
+            if (data.choices && data.choices[0]) {
+                content = data.choices[0].message.content;
+            }
+
+            if (!skipDisplay) {
+                const aiMsg = document.createElement('div');
+                aiMsg.className = 'ai-message ai-assistant';
+                
+                if (data.error) {
+                    aiMsg.innerHTML = `<div class="message-text"><strong>Error:</strong> ${data.error.message}</div>`;
+                } else if (content) {
+                    aiMsg.innerHTML = `<div class="message-text">${content.replace(/\n/g, '<br>')}</div>`;
+                } else {
+                    aiMsg.innerHTML = `<div class="message-text"><strong>Error:</strong> No response</div>`;
+                }
+
+                chatArea.appendChild(aiMsg);
+                chatArea.scrollTop = chatArea.scrollHeight;
+            } else {
+                // Still add a placeholder message that will be replaced
+                const aiMsg = document.createElement('div');
+                aiMsg.className = 'ai-message ai-assistant';
+                aiMsg.innerHTML = `<div class="message-text">Processing...</div>`;
+                chatArea.appendChild(aiMsg);
+            }
+            
+            // Return object with content
+            return {
+                content: content
+            };
+        } catch (error) {
+            loadingMsg.remove();
+            if (!skipDisplay) {
+                const aiMsg = document.createElement('div');
+                aiMsg.className = 'ai-message ai-assistant';
+                aiMsg.innerHTML = `<div class="message-text"><strong>Error:</strong> ${error.message}</div>`;
+                chatArea.appendChild(aiMsg);
+                chatArea.scrollTop = chatArea.scrollHeight;
+            }
+            return { content: null };
+        }
+    }
+
+    copyToClipboard(text, button) {
+        navigator.clipboard.writeText(text).then(() => {
+            const originalText = button.textContent;
+            button.textContent = '✓ Copied!';
+            button.style.background = '#0F0';
+            button.style.color = '#000';
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.style.background = '';
+                button.style.color = '';
+            }, 2000);
+        }).catch(err => {
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.opacity = '0';
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                const originalText = button.textContent;
+                button.textContent = '✓ Copied!';
+                button.style.background = '#0F0';
+                button.style.color = '#000';
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.style.background = '';
+                    button.style.color = '';
+                }, 2000);
+            } catch (err) {
+                alert('Failed to copy');
+            }
+            document.body.removeChild(textArea);
+        });
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    setupImageContextMenu(img, imageUrl) {
+        let contextMenu = null;
+
+        img.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Remove existing menu if present
+            if (contextMenu) {
+                contextMenu.remove();
+                contextMenu = null;
+                return;
+            }
+
+            // Create context menu
+            contextMenu = document.createElement('div');
+            contextMenu.className = 'image-context-menu';
+            contextMenu.innerHTML = `
+                <div class="context-menu-item" data-action="save">💾 Save Image</div>
+                <div class="context-menu-item" data-action="copy-url">📋 Copy URL</div>
+                <div class="context-menu-item" data-action="open">🔗 Open in New Tab</div>
+            `;
+
+            // Position menu at cursor
+            const chatArea = document.getElementById('ai-chat-area');
+            const chatRect = chatArea.getBoundingClientRect();
+            contextMenu.style.left = (e.clientX - chatRect.left) + 'px';
+            contextMenu.style.top = (e.clientY - chatRect.top) + 'px';
+
+            chatArea.appendChild(contextMenu);
+
+            // Handle menu actions
+            contextMenu.querySelectorAll('.context-menu-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const action = item.dataset.action;
+                    if (action === 'save') {
+                        this.saveImage(imageUrl, img);
+                    } else if (action === 'copy-url') {
+                        this.copyToClipboard(imageUrl, item);
+                    } else if (action === 'open') {
+                        window.open(imageUrl, '_blank');
+                    }
+                    contextMenu.remove();
+                    contextMenu = null;
+                });
+            });
+
+            // Close menu on outside click
+            setTimeout(() => {
+                const closeMenu = (e) => {
+                    if (contextMenu && !contextMenu.contains(e.target) && e.target !== img) {
+                        contextMenu.remove();
+                        contextMenu = null;
+                        document.removeEventListener('click', closeMenu);
+                    }
+                };
+                document.addEventListener('click', closeMenu);
+            }, 0);
+        });
+    }
+
+    saveImage(imageUrl, imgElement) {
+        // Try to use the img element's current source first (handles CORS better)
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Set canvas dimensions to match image
+        canvas.width = imgElement.naturalWidth || imgElement.width;
+        canvas.height = imgElement.naturalHeight || imgElement.height;
+        
+        // Draw image to canvas
+        ctx.drawImage(imgElement, 0, 0);
+        
+        // Convert canvas to blob and download
+        canvas.toBlob((blob) => {
+            if (blob) {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `quill-image-${Date.now()}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            } else {
+                // Fallback to fetch if canvas method fails
+                fetch(imageUrl, { mode: 'cors' })
+                    .then(response => {
+                        if (!response.ok) throw new Error('Network response was not ok');
+                        return response.blob();
+                    })
+                    .then(blob => {
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `quill-image-${Date.now()}.png`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                    })
+                    .catch(err => {
+                        console.error('Error saving image:', err);
+                        alert('Failed to save image. Please try right-clicking the image and selecting "Save Image As" instead.');
+                    });
+            }
+        }, 'image/png');
+    }
+
+    async analyzeImageWithVision(imageUrl, userRequest) {
+        try {
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.openaiApiKey}`
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4o',
+                    messages: [
+                        {
+                            role: 'user',
+                            content: [
+                                {
+                                    type: 'text',
+                                    text: `You are analyzing a reference image that will be used to generate a new image. The user's request is: "${userRequest}"
+
+Provide an EXTREMELY detailed and structured analysis of this reference image. Include:
+
+1. SUBJECTS AND CHARACTERS: Describe every person, character, or main subject in detail - their appearance, clothing, pose, expression, position in frame, size relative to image
+2. COMPOSITION: Exact layout, positioning of elements, perspective, camera angle, framing
+3. COLORS AND PALETTE: Specific color names and where they appear, dominant colors, color scheme, lighting
+4. STYLE AND AESTHETIC: Art style, visual treatment, mood, atmosphere
+5. BACKGROUND AND ENVIRONMENT: Detailed description of setting, objects, textures, details
+6. SPECIFIC VISUAL ELEMENTS: Any distinctive features, patterns, textures, or unique characteristics
+
+Be extremely specific and detailed. The goal is to recreate this image accurately with the user's modifications. Format your response as a clear, structured description that can be directly used in image generation.`
+                                },
+                                {
+                                    type: 'image_url',
+                                    image_url: { url: imageUrl }
+                                }
+                            ]
+                        }
+                    ],
+                    max_tokens: 800
+                })
+            });
+
+            const data = await response.json();
+            if (data.choices && data.choices[0]) {
+                return data.choices[0].message.content;
+            }
+            return null;
+        } catch (error) {
+            console.error('Error analyzing image:', error);
+            return null;
+        }
     }
 
     updateStatusBar() {
@@ -1150,8 +2352,107 @@ class ProgramManager {
         
         const dateElement = document.getElementById('status-date');
         if (dateElement) {
-            dateElement.textContent = `${dayName}, ${monthName} ${date}, ${year}`;
+            // Use selected year instead of current year
+            const displayYear = this.selectedYear || 1992;
+            dateElement.textContent = `${dayName}, ${monthName} ${date}, ${displayYear}`;
         }
+    }
+
+    setupYearSelector() {
+        const dateElement = document.getElementById('status-date');
+        if (!dateElement) return;
+
+        // Make date clickable
+        dateElement.style.cursor = 'pointer';
+        dateElement.title = 'Click to change year';
+
+        dateElement.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.showYearSelectorDialog();
+        });
+    }
+
+    showYearSelectorDialog() {
+        // Remove existing dialog if present
+        const existingDialog = document.getElementById('year-selector-dialog');
+        if (existingDialog) {
+            existingDialog.remove();
+        }
+
+        // Create dialog
+        const dialog = document.createElement('div');
+        dialog.id = 'year-selector-dialog';
+        dialog.className = 'year-selector-dialog';
+        dialog.innerHTML = `
+            <div class="dialog-titlebar">
+                <span class="dialog-title">Select Year</span>
+                <button class="dialog-close-btn" id="year-dialog-close">✕</button>
+            </div>
+            <div class="dialog-content">
+                <div class="dialog-text">Choose a year to travel through time:</div>
+                <div class="year-options">
+                    <button class="year-btn" data-year="1985">1985</button>
+                    <button class="year-btn" data-year="1992">1992</button>
+                    <button class="year-btn" data-year="1995">1995</button>
+                    <button class="year-btn" data-year="1998">1998</button>
+                    <button class="year-btn" data-year="2000">2000</button>
+                    <button class="year-btn" data-year="2001">2001</button>
+                </div>
+            </div>
+        `;
+
+        document.querySelector('.screen-content').appendChild(dialog);
+
+        // Position dialog
+        const screenContent = document.querySelector('.screen-content');
+        const rect = screenContent.getBoundingClientRect();
+        dialog.style.left = (rect.width / 2 - 150) + 'px';
+        dialog.style.top = (rect.height / 2 - 100) + 'px';
+
+        // Close button
+        document.getElementById('year-dialog-close').addEventListener('click', () => {
+            dialog.remove();
+        });
+
+        // Year buttons
+        dialog.querySelectorAll('.year-btn').forEach(btn => {
+            const year = parseInt(btn.dataset.year);
+            if (year === this.selectedYear) {
+                btn.classList.add('selected');
+            }
+            
+            btn.addEventListener('click', () => {
+                this.selectedYear = year;
+                localStorage.setItem('selectedYear', year.toString());
+                this.applyYearTheme(year);
+                dialog.remove();
+                this.updateStatusBar();
+            });
+        });
+
+        // Close on outside click
+        document.addEventListener('click', (e) => {
+            if (!dialog.contains(e.target) && e.target !== document.getElementById('status-date')) {
+                dialog.remove();
+            }
+        }, { once: true });
+    }
+
+    applyYearTheme(year) {
+        const body = document.body;
+        const roomBackground = document.querySelector('.room-background');
+        
+        // Remove existing year classes
+        body.classList.remove('year-1985', 'year-1992', 'year-1995', 'year-1998', 'year-2000', 'year-2001');
+        roomBackground.classList.remove('year-1985', 'year-1992', 'year-1995', 'year-1998', 'year-2000', 'year-2001');
+
+        // Add year class
+        body.classList.add(`year-${year}`);
+        roomBackground.classList.add(`year-${year}`);
+
+        // Apply year-specific theme
+        // For now, we'll set up the structure - you can add different monitor images and themes later
+        // Example: if (year === 1995) { roomBackground.style.backgroundImage = 'url(assets/monitor-1995.png)'; }
     }
 
     setupProgramManagerControls() {
