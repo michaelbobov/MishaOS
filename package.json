@@ -1,10 +1,6 @@
 {
   "name": "mishaos",
   "version": "1.0.0",
-  "description": "Retro Operating System Portfolio",
-  "type": "module",
-  "engines": {
-    "node": ">=18.x"
-  }
+  "description": "Retro Operating System Portfolio"
 }
 
