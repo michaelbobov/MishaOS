@@ -2,6 +2,8 @@
 
 A nostalgic retro operating system interface built with HTML, CSS, and JavaScript. Experience the look and feel of classic Windows systems from the 1990s.
 
+<!-- Deployment trigger -->
+
 ## Features
 
 - Retro desktop environment with Program Manager
