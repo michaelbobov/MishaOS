@@ -1,8 +1,0 @@
-{
-  "functions": {
-    "api/openai.js": {
-      "runtime": "nodejs20.x"
-    }
-  }
-}
-
